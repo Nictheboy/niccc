@@ -1,10 +1,44 @@
 #pragma once
+#include <fstream>
 #include <stdexcept>
 #include <string>
 
 struct ScanContext {
     std::string filename;
     int row, column;
+    std::ifstream file;
+    std::string currentToken;
+
+    ScanContext(const std::string& filename)
+        : filename(filename), row(1), column(1) {
+        file.open(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open file: " + filename);
+        }
+    }
+
+    bool next(char& c) {
+        if (file.get(c)) {
+            if (c == '\n') {
+                row++;
+                column = 1;
+            } else {
+                column++;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    void appendToToken(char c) {
+        currentToken += c;
+    }
+
+    std::string getTokenValue() {
+        std::string value = currentToken;
+        currentToken.clear();
+        return value;
+    }
 };
 
 class CompilerError : public std::runtime_error {

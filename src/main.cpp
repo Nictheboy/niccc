@@ -1,22 +1,76 @@
 #include <fstream>
-#include <sstream>
+#include <iostream>
+#include <memory>
 #include <string>
-#include "tokenizer_spec.hpp"
+#include "common.hpp"
+#include "parser.hpp"
+#include "tokenizer.hpp"
+
+class SyntaxAnalyzer {
+   private:
+    std::shared_ptr<Tokenizer::Tokenizer> tokenizer;
+    std::shared_ptr<Parser::Parser> parser;
+    std::ofstream outputFile;
+    ScanContext scanContext;
+
+    void outputToken(const Tokenizer::Token& token) {
+        outputFile << token.definition->name << " " << token.matched << std::endl;
+    }
+
+    void outputSyntaxComponent(const std::string& name) {
+        if (name != "BlockItem" && name != "Decl" && name != "BType") {
+            outputFile << "<" << name << ">" << std::endl;
+        }
+    }
+
+   public:
+    SyntaxAnalyzer()
+        : scanContext("testfile.txt") {
+        // Initialize tokenizer
+        tokenizer = Tokenizer::createTokenizer();
+
+        // Initialize parser
+        auto grammarRules = Parser::createGrammarRules();
+        parser = std::make_shared<Parser::Parser>(grammarRules, scanContext);
+
+        // Open output file
+        outputFile.open("output.txt");
+        if (!outputFile.is_open()) {
+            throw std::runtime_error("Failed to open output.txt");
+        }
+    }
+
+    ~SyntaxAnalyzer() {
+        if (outputFile.is_open()) {
+            outputFile.close();
+        }
+    }
+
+    void analyze() {
+        try {
+            // Tokenize the input
+            auto tokens = tokenizer->parse(scanContext.getTokenValue(), scanContext.filename);
+
+            // Parse the tokens
+            parser->parse(tokens);
+
+            // Output the final CompUnit
+            outputSyntaxComponent("CompUnit");
+
+        } catch (const CompilerError& e) {
+            std::cerr << e.what() << std::endl;
+            throw;
+        }
+    }
+};
 
 int main() {
-    std::ifstream file("testfile.txt");
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string fileContent = buffer.str();
-    auto tokenizer = createTokenizer();
-    auto tokenList = tokenizer->parse(fileContent, "testfile.txt");
-    std::ofstream outFile("output.txt", std::ios::trunc);
-    for (auto& token : *tokenList) {
-        if (token.definition->name == "WHITESPACE" || token.definition->name == "COMMENT")
-            continue;
-        ;
-        outFile << token.definition->name << " " << token.matched << "\n";
+    try {
+        SyntaxAnalyzer analyzer;
+        analyzer.analyze();
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
     }
-    outFile.close();
-    return 0;
 }

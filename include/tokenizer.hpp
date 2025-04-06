@@ -385,10 +385,7 @@ class Tokenizer {
     }
 
     std::shared_ptr<TokenList> parse(std::string str, std::string filename) {
-        ScanContext scanContext;
-        scanContext.filename = filename;
-        scanContext.row = 1;
-        scanContext.column = 1;
+        ScanContext scanContext(filename);
         auto machine = StatusMachine(definitions, scanContext);
         std::string currentToken;
         std::string currentRow;
@@ -417,5 +414,8 @@ class Tokenizer {
         return tokenList;
     }
 };
+
+// Define the tokenizer
+std::shared_ptr<Tokenizer> createTokenizer();
 
 }  // namespace Tokenizer

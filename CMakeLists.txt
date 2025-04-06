@@ -29,6 +29,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 if(NOT TARGET libniccc)
     set(LIB_SOURCES
         src/tokenizer_spec.cpp
+        src/parser_spec.cpp
     )
     if(WIN32)
         set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -37,6 +38,7 @@ if(NOT TARGET libniccc)
     set_target_properties(libniccc PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_include_directories(libniccc PUBLIC include)
     install(TARGETS libniccc)
+    set_property(TARGET libniccc PROPERTY OUTPUT_NAME niccc)
 endif()
 
 if(NOT TARGET niccc)
