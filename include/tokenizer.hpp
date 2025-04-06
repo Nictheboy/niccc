@@ -1,6 +1,7 @@
 #pragma once
 #include <assert.h>
 #include <algorithm>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <string>
@@ -385,6 +386,7 @@ class Tokenizer {
     }
 
     std::shared_ptr<TokenList> parse(std::string str, std::string filename) {
+        std::cerr << "Tokenizer input: '" << str << "'" << std::endl;
         ScanContext scanContext(filename);
         auto machine = StatusMachine(definitions, scanContext);
         std::string currentToken;
@@ -393,15 +395,18 @@ class Tokenizer {
         machine.onCharAcceptted.AddListener([&](char c) {
             currentToken += c;
             currentRow += c;
+            std::cerr << "Accepted char: '" << c << "'" << std::endl;
         });
         machine.onTokenCommitted.AddListener([&](std::shared_ptr<TokenDefinition> committedToken) {
             Token token;
             token.definition = committedToken;
             token.matched = currentToken;
             tokenList->push_back(token);
+            std::cerr << "Committed token: " << token.definition->name << " -> '" << token.matched << "'" << std::endl;
             currentToken.clear();
         });
         for (char c : str) {
+            std::cerr << "Processing char: '" << c << "'" << std::endl;
             while (!machine.next(c))
                 ;
             if (c == '\n') {
@@ -411,6 +416,7 @@ class Tokenizer {
             }
         }
         machine.next('\0');
+        std::cerr << "Tokenizer produced " << tokenList->size() << " tokens" << std::endl;
         return tokenList;
     }
 };

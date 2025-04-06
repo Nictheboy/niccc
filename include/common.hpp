@@ -1,5 +1,7 @@
 #pragma once
 #include <fstream>
+#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -15,6 +17,7 @@ struct ScanContext {
         if (!file.is_open()) {
             throw std::runtime_error("Failed to open file: " + filename);
         }
+        std::cerr << "Successfully opened file: " << filename << std::endl;
     }
 
     bool next(char& c) {
@@ -35,9 +38,12 @@ struct ScanContext {
     }
 
     std::string getTokenValue() {
-        std::string value = currentToken;
-        currentToken.clear();
-        return value;
+        // Read the entire file into a string
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string content = buffer.str();
+        std::cerr << "Read file content: '" << content << "'" << std::endl;
+        return content;
     }
 };
 
