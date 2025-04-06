@@ -7,6 +7,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "ast.hpp"
 #include "common.hpp"
 #include "surakarta_event.hpp"
 #include "tokenizer.hpp"
@@ -27,13 +28,11 @@ class ProductionRule : public std::enable_shared_from_this<ProductionRule> {
     std::string name;
     std::vector<std::shared_ptr<Tokenizer::TokenDefinition>> symbols;
     int priority;  // lower priority value means higher priority
-    std::function<void(std::vector<std::shared_ptr<Tokenizer::Token>>&)> reduceAction;
 
     ProductionRule(std::string name,
                    std::vector<std::shared_ptr<Tokenizer::TokenDefinition>> symbols,
-                   int priority,
-                   std::function<void(std::vector<std::shared_ptr<Tokenizer::Token>>&)> reduceAction)
-        : name(name), symbols(symbols), priority(priority), reduceAction(reduceAction) {}
+                   int priority)
+        : name(name), symbols(symbols), priority(priority) {}
 };
 
 // Action type for the parsing table
@@ -113,8 +112,10 @@ class Parser {
     std::shared_ptr<ProductionRuleList> rules;
     std::vector<std::shared_ptr<LRState>> states;
     std::vector<std::shared_ptr<Tokenizer::Token>> symbolStack;
+    std::vector<std::shared_ptr<AST::Node>> astStack;
     std::vector<int> stateStack;
     ScanContext& scanContext;
+    std::shared_ptr<AST::Node> astRoot;
 
     // Build the closure of a set of items
     std::vector<LRItem> closure(const std::vector<LRItem>& items) {
@@ -316,6 +317,7 @@ class Parser {
         }
 
         symbolStack.push_back(token);
+        astStack.push_back(std::make_shared<AST::TerminalNode>(token));
         stateStack.push_back(action.value);
 
         std::cerr << "Shifted to state " << action.value << std::endl;
@@ -326,14 +328,20 @@ class Parser {
 
         // Pop the right-hand side
         std::vector<std::shared_ptr<Tokenizer::Token>> matchedTokens;
+        std::vector<std::shared_ptr<AST::Node>> matchedNodes;
         for (size_t i = 0; i < rule->symbols.size(); ++i) {
             matchedTokens.insert(matchedTokens.begin(), symbolStack.back());
+            matchedNodes.insert(matchedNodes.begin(), astStack.back());
             symbolStack.pop_back();
+            astStack.pop_back();
             stateStack.pop_back();
         }
 
-        // Execute reduce action
-        rule->reduceAction(matchedTokens);
+        // Create a non-terminal node for this reduction
+        auto nonTerminalNode = std::make_shared<AST::NonTerminalNode>(rule->name);
+        for (const auto& node : matchedNodes) {
+            nonTerminalNode->addChild(node);
+        }
 
         // Push the left-hand side
         auto nonTerminal = std::make_shared<Tokenizer::Token>();
@@ -346,6 +354,7 @@ class Parser {
         );
         nonTerminal->matched = rule->name;
         symbolStack.push_back(nonTerminal);
+        astStack.push_back(nonTerminalNode);
 
         // Goto
         auto currentState = states[stateStack.back()];
@@ -375,7 +384,7 @@ class Parser {
         buildTables();
     }
 
-    void parse(std::shared_ptr<Tokenizer::TokenList> tokens) {
+    std::shared_ptr<AST::Node> parse(std::shared_ptr<Tokenizer::TokenList> tokens) {
         std::cerr << "Starting parse with " << tokens->size() << " tokens:" << std::endl;
         for (const auto& token : *tokens) {
             std::cerr << "Token: " << token.definition->name << " -> " << token.matched << std::endl;
@@ -384,6 +393,7 @@ class Parser {
         // Initialize stacks
         stateStack.clear();
         symbolStack.clear();
+        astStack.clear();
         stateStack.push_back(0);  // Start with state 0
 
         // Process each token
@@ -426,7 +436,8 @@ class Parser {
 
                 case ActionType::ACCEPT:
                     std::cerr << "accept" << std::endl;
-                    return;
+                    astRoot = astStack.back();
+                    return astRoot;
 
                 case ActionType::ERROR:
                     // Try to find a reduce action in the current state
@@ -454,7 +465,8 @@ class Parser {
 
             if (action.type == ActionType::ACCEPT) {
                 std::cerr << "accept" << std::endl;
-                return;
+                astRoot = astStack.back();
+                return astRoot;
             } else if (action.type == ActionType::REDUCE) {
                 std::cerr << "reduce by rule " << action.value << std::endl;
                 reduce((*rules)[action.value]);
