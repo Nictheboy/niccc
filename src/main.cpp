@@ -13,10 +13,10 @@ void traverseAST(std::shared_ptr<AST::Node> node, std::ofstream& outputFile) {
         for (const auto& child : nonTerminal->children) {
             traverseAST(child, outputFile);
         }
-        
+
         // Output syntax component name if it's not one of the excluded types
-        if (nonTerminal->name != "BlockItem" && 
-            nonTerminal->name != "Decl" && 
+        if (nonTerminal->name != "BlockItem" &&
+            nonTerminal->name != "Decl" &&
             nonTerminal->name != "BType") {
             outputFile << "<" << nonTerminal->name << ">" << std::endl;
         }
@@ -24,17 +24,19 @@ void traverseAST(std::shared_ptr<AST::Node> node, std::ofstream& outputFile) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
-        return 1;
-    }
+    // if (argc != 2) {
+    //     std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
+    //     return 1;
+    // }
 
-    std::ifstream file(argv[1]);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << argv[1] << std::endl;
-        return 1;
-    }
-    std::cout << "Successfully opened file: " << argv[1] << std::endl;
+    // std::ifstream file(argv[1]);
+    // if (!file.is_open()) {
+    //     std::cerr << "Failed to open file: " << argv[1] << std::endl;
+    //     return 1;
+    // }
+    // std::cout << "Successfully opened file: " << argv[1] << std::endl;
+
+    std::ifstream file("testfile.txt");
 
     // Read file content
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -45,8 +47,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Tokenizer input: '" << content << "'" << std::endl;
 
     // Tokenize
-    ScanContext scanContext(argv[1]);
-    auto tokens = tokenizer->parse(content, argv[1]);
+    ScanContext scanContext("testfile.txt");
+    auto tokens = tokenizer->parse(content, "testfile.txt");
     std::cout << "Tokenizer produced " << tokens->size() << " tokens" << std::endl;
 
     // Create parser

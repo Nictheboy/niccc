@@ -266,7 +266,7 @@ class Parser {
             if (state->stateId == 21) {  // State after RBRACE
                 // Add reduce action for Block
                 auto blockRule = std::find_if(rules->begin(), rules->end(),
-                                              [](const auto& rule) { return rule->name == "Block"; });
+                                              [](const std::shared_ptr<ProductionRule>& rule) { return rule->name == "Block"; });
                 if (blockRule != rules->end()) {
                     int blockRuleNumber = std::distance(rules->begin(), blockRule);
                     state->actions[nullptr] = Action(ActionType::REDUCE, blockRuleNumber);
@@ -275,14 +275,14 @@ class Parser {
 
             // Debug output
             std::cerr << "State " << state->stateId << " actions:" << std::endl;
-            for (const auto& action : state->actions) {
-                std::cerr << "  " << (action.first ? action.first->name : "EOF") << " -> ";
-                switch (action.second.type) {
+            for (const auto& actionPair : state->actions) {
+                std::cerr << "  " << (actionPair.first ? actionPair.first->name : "EOF") << " -> ";
+                switch (actionPair.second.type) {
                     case ActionType::SHIFT:
-                        std::cerr << "shift " << action.second.value;
+                        std::cerr << "shift " << actionPair.second.value;
                         break;
                     case ActionType::REDUCE:
-                        std::cerr << "reduce " << action.second.value;
+                        std::cerr << "reduce " << actionPair.second.value;
                         break;
                     case ActionType::ACCEPT:
                         std::cerr << "accept";
@@ -305,9 +305,9 @@ class Parser {
 
         // Find action for this token
         Action action;
-        for (const auto& [symbol, act] : currentState->actions) {
-            if (symbol && symbol->name == token->definition->name) {
-                action = act;
+        for (const auto& actionPair : currentState->actions) {
+            if (actionPair.first && actionPair.first->name == token->definition->name) {
+                action = actionPair.second;
                 break;
             }
         }
@@ -361,9 +361,9 @@ class Parser {
 
         // Find action for this non-terminal
         Action action;
-        for (const auto& [symbol, act] : currentState->actions) {
-            if (symbol && symbol->name == nonTerminal->definition->name) {
-                action = act;
+        for (const auto& actionPair : currentState->actions) {
+            if (actionPair.first && actionPair.first->name == nonTerminal->definition->name) {
+                action = actionPair.second;
                 break;
             }
         }
@@ -414,9 +414,9 @@ class Parser {
 
             // Find action for this token
             Action action;
-            for (const auto& [symbol, act] : currentState->actions) {
-                if (symbol && symbol->name == nextToken->definition->name) {
-                    action = act;
+            for (const auto& actionPair : currentState->actions) {
+                if (actionPair.first && actionPair.first->name == nextToken->definition->name) {
+                    action = actionPair.second;
                     break;
                 }
             }
@@ -442,10 +442,10 @@ class Parser {
                 case ActionType::ERROR:
                     // Try to find a reduce action in the current state
                     bool foundReduce = false;
-                    for (const auto& [symbol, act] : currentState->actions) {
-                        if (act.type == ActionType::REDUCE) {
-                            std::cerr << "reduce by rule " << act.value << std::endl;
-                            reduce((*rules)[act.value]);
+                    for (const auto& actionPair : currentState->actions) {
+                        if (actionPair.second.type == ActionType::REDUCE) {
+                            std::cerr << "reduce by rule " << actionPair.second.value << std::endl;
+                            reduce((*rules)[actionPair.second.value]);
                             foundReduce = true;
                             break;
                         }
