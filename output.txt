@@ -1,14 +1,12 @@
 INTTK int
-<Type>
+<FuncType>
 IDENFR add
 LPARENT (
 INTTK int
-<Type>
 IDENFR a
 <FuncFParam>
 COMMA ,
 INTTK int
-<Type>
 IDENFR b
 <FuncFParam>
 <FuncFParams>
@@ -35,16 +33,14 @@ RBRACE }
 <Block>
 <FuncDef>
 INTTK int
-<Type>
+<FuncType>
 IDENFR sub
 LPARENT (
 INTTK int
-<Type>
 IDENFR a
 <FuncFParam>
 COMMA ,
 INTTK int
-<Type>
 IDENFR b
 <FuncFParam>
 <FuncFParams>
@@ -71,16 +67,14 @@ RBRACE }
 <Block>
 <FuncDef>
 INTTK int
-<Type>
+<FuncType>
 IDENFR mul
 LPARENT (
 INTTK int
-<Type>
 IDENFR a
 <FuncFParam>
 COMMA ,
 INTTK int
-<Type>
 IDENFR b
 <FuncFParam>
 <FuncFParams>
@@ -106,16 +100,14 @@ RBRACE }
 <Block>
 <FuncDef>
 INTTK int
-<Type>
+<FuncType>
 IDENFR div
 LPARENT (
 INTTK int
-<Type>
 IDENFR a
 <FuncFParam>
 COMMA ,
 INTTK int
-<Type>
 IDENFR b
 <FuncFParam>
 <FuncFParams>
@@ -146,7 +138,6 @@ LPARENT (
 RPARENT )
 LBRACE {
 INTTK int
-<Type>
 IDENFR a
 <VarDef>
 COMMA ,
@@ -300,6 +291,46 @@ IDENFR b
 <Exp>
 <FuncRParams>
 RPARENT )
+<UnaryExp>
+<MulExp>
+<AddExp>
+<Exp>
+SEMICN ;
+<Stmt>
+PRINTFTK printf
+LPARENT (
+STRCON "%d, %d, %d\n"
+COMMA ,
+IDENFR a
+<LVal>
+<PrimaryExp>
+<UnaryExp>
+<MulExp>
+<AddExp>
+<Exp>
+COMMA ,
+IDENFR b
+<LVal>
+<PrimaryExp>
+<UnaryExp>
+<MulExp>
+<AddExp>
+<Exp>
+COMMA ,
+IDENFR c
+<LVal>
+<PrimaryExp>
+<UnaryExp>
+<MulExp>
+<AddExp>
+<Exp>
+RPARENT )
+SEMICN ;
+<Stmt>
+RETURNTK return
+INTCON 0
+<Number>
+<PrimaryExp>
 <UnaryExp>
 <MulExp>
 <AddExp>

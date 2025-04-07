@@ -6,14 +6,16 @@
 #include "parser.hpp"
 #include "tokenizer.hpp"
 
-void traverseAST(std::shared_ptr<AST::Node> node, std::ofstream& outputFile) {
+void traverseAST(std::shared_ptr<AST::Node> node,
+                 std::ofstream& outputFile,
+                 std::shared_ptr<AST::Node> parent = nullptr) {
     if (auto terminal = std::dynamic_pointer_cast<AST::TerminalNode>(node)) {
         // Output token information
         outputFile << terminal->token->definition->name << " " << terminal->token->matched << std::endl;
     } else if (auto nonTerminal = std::dynamic_pointer_cast<AST::NonTerminalNode>(node)) {
         // First traverse all children
         for (const auto& child : nonTerminal->children) {
-            traverseAST(child, outputFile);
+            traverseAST(child, outputFile, node);
         }
 
         // Output syntax component name if it's not one of the excluded types
@@ -22,10 +24,29 @@ void traverseAST(std::shared_ptr<AST::Node> node, std::ofstream& outputFile) {
             nonTerminal->name != "FuncFParamList" &&
             nonTerminal->name != "FuncRParamList" &&
             nonTerminal->name != "BlockItem" &&
+            nonTerminal->name != "ConstInitValList" &&
+            nonTerminal->name != "ConstInitValListOpt" &&
+            nonTerminal->name != "ConstDeclList" &&
             nonTerminal->name != "Decl" &&
             nonTerminal->name != "VarDeclList" &&
-            nonTerminal->name != "BType") {
+            nonTerminal->name != "PrintfStmt" &&
+            nonTerminal->name != "FuncRParams" &&
+            nonTerminal->name != "Type") {
             outputFile << "<" << nonTerminal->name << ">" << std::endl;
+        }
+
+        if (nonTerminal->name == "Type") {
+            auto nonTerminalParent = std::dynamic_pointer_cast<AST::NonTerminalNode>(parent);
+            if (nonTerminalParent->name == "FuncDef") {
+                outputFile << "<FuncType>" << std::endl;
+            }
+        }
+
+        if (nonTerminal->name == "FuncRParams") {
+            auto nonTerminalParent = std::dynamic_pointer_cast<AST::NonTerminalNode>(parent);
+            if (nonTerminalParent->name != "PrintfStmt") {
+                outputFile << "<FuncRParams>" << std::endl;
+            }
         }
     }
 }

@@ -411,8 +411,15 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
             token("LPARENT"),
             token("RPARENT"),
             token("SEMICN")}));
+    // Stmt → PrintfStmt
     rules->push_back(std::make_shared<ProductionRule>(
         "Stmt",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
+            token("PrintfStmt")}));
+
+    // PrintfStmt → 'printf' '(' [StrConst] ')' ';'
+    rules->push_back(std::make_shared<ProductionRule>(
+        "PrintfStmt",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("PRINTFTK"),
             token("LPARENT"),
@@ -420,13 +427,13 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
             token("RPARENT"),
             token("SEMICN")}));
     rules->push_back(std::make_shared<ProductionRule>(
-        "Stmt",
+        "PrintfStmt",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("PRINTFTK"),
             token("LPARENT"),
             token("STRCON"),
             token("COMMA"),
-            token("Exp"),
+            token("FuncRParams"),
             token("RPARENT"),
             token("SEMICN")}));
 
@@ -455,7 +462,7 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
             token("Exp"),
             token("RBRACK")}));
 
-    // PrimaryExp → '(' Exp ')' | LVal | Number
+    // PrimaryExp → '(' Exp ')' | LVal | Number | STRCON
     rules->push_back(std::make_shared<ProductionRule>(
         "PrimaryExp",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
@@ -470,6 +477,10 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
         "PrimaryExp",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("Number")}));
+    rules->push_back(std::make_shared<ProductionRule>(
+        "PrimaryExp",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
+            token("STRCON")}));
 
     // Number → IntConst
     rules->push_back(std::make_shared<ProductionRule>(
