@@ -1,6 +1,25 @@
+int add(int a, int b) {
+    return a + b;
+}
+
+int sub(int a, int b) {
+    return a - b;
+}
+
+int mul(int a, int b) {
+    return a * b;
+}
+
+int div(int a, int b) {
+    return a / b;
+}
+
 int main(){
-    int c;
-    c= getint();
-    printf("%d",c);
-    return c;
+    int a, b, c, d, e, result = 0;
+    a = getint();
+    b = getint();
+    c = getint();
+    d = getint();
+    e = getint();
+    e = -e + c * d - a % b + c / (a + b) + sum(a, b)
 } 

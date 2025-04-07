@@ -5,6 +5,10 @@
 
 namespace Parser {
 
+// Define the static member here
+std::shared_ptr<Tokenizer::TokenDefinition> Parser::EOF_DEFINITION = 
+    std::make_shared<Tokenizer::TokenDefinition>("$EOF$", nullptr, nullptr, nullptr, -1);
+
 // Map to store canonical TokenDefinition pointers for grammar symbols
 static std::map<std::string, std::shared_ptr<Tokenizer::TokenDefinition>> grammarSymbolCache;
 
@@ -76,24 +80,27 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
             token("VarDecl")},
         1));
 
-    // ConstDecl → 'const' BType ConstDef { ',' ConstDef } ';'
+    // ConstDecl → 'const' BType ConstDef ConstDeclList ';'
+    // ConstDeclList → ',' ConstDef ConstDeclList | ε
     rules->push_back(std::make_shared<ProductionRule>(
         "ConstDecl",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("CONSTTK"),
             token("BType"),
             token("ConstDef"),
+            token("ConstDeclList"),
             token("SEMICN")},
         2));
     rules->push_back(std::make_shared<ProductionRule>(
-        "ConstDecl",
+        "ConstDeclList",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
-            token("CONSTTK"),
-            token("BType"),
-            token("ConstDef"),
             token("COMMA"),
             token("ConstDef"),
-            token("SEMICN")},
+            token("ConstDeclList")},
+        2));
+    rules->push_back(std::make_shared<ProductionRule>(
+        "ConstDeclList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{},
         2));
 
     // BType → 'int'
@@ -122,54 +129,71 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
             token("ConstInitVal")},
         4));
 
-    // ConstInitVal → ConstExp | '{' [ ConstInitVal { ',' ConstInitVal } ] '}'
+    // ConstInitVal → ConstExp
     rules->push_back(std::make_shared<ProductionRule>(
         "ConstInitVal",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("ConstExp")},
         5));
+
+    // ConstInitVal → '{' ConstInitValListOpt '}'
     rules->push_back(std::make_shared<ProductionRule>(
         "ConstInitVal",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("LBRACE"),
-            token("RBRACE")},
-        5));
-    rules->push_back(std::make_shared<ProductionRule>(
-        "ConstInitVal",
-        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
-            token("LBRACE"),
-            token("ConstInitVal"),
-            token("RBRACE")},
-        5));
-    rules->push_back(std::make_shared<ProductionRule>(
-        "ConstInitVal",
-        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
-            token("LBRACE"),
-            token("ConstInitVal"),
-            token("COMMA"),
-            token("ConstInitVal"),
+            token("ConstInitValListOpt"),
             token("RBRACE")},
         5));
 
-    // VarDecl → BType VarDef { ',' VarDef } ';'
+    // ConstInitValListOpt -> ConstInitVal ConstInitValList | ε
+    rules->push_back(std::make_shared<ProductionRule>(
+        "ConstInitValListOpt",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
+            token("ConstInitVal"),
+            token("ConstInitValList")},
+        5));
+    rules->push_back(std::make_shared<ProductionRule>(
+        "ConstInitValListOpt",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{},
+        5));
+
+    // ConstInitValList -> ',' ConstInitVal ConstInitValList | ε
+    rules->push_back(std::make_shared<ProductionRule>(
+        "ConstInitValList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
+            token("COMMA"),
+            token("ConstInitVal"),
+            token("ConstInitValList")},
+        5));
+    rules->push_back(std::make_shared<ProductionRule>(
+        "ConstInitValList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{},
+        5));
+
+    // VarDecl → BType VarDef VarDeclList ';'
+    // VarDeclList → ',' VarDef VarDeclList | ε
     rules->push_back(std::make_shared<ProductionRule>(
         "VarDecl",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("BType"),
             token("VarDef"),
+            token("VarDeclList"),
             token("SEMICN")},
         6));
     rules->push_back(std::make_shared<ProductionRule>(
-        "VarDecl",
+        "VarDeclList",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
-            token("BType"),
-            token("VarDef"),
             token("COMMA"),
             token("VarDef"),
-            token("SEMICN")},
+            token("VarDeclList")},
+        6));
+    rules->push_back(std::make_shared<ProductionRule>(
+        "VarDeclList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{},
         6));
 
-    // VarDef → Ident [ '[' ConstExp ']' ] | Ident [ '[' ConstExp ']' ] '=' InitVal
+    // VarDef → Ident [ '[' ConstExp ']' ]
+    //        | Ident [ '[' ConstExp ']' ] '=' InitVal
     rules->push_back(std::make_shared<ProductionRule>(
         "VarDef",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
@@ -201,33 +225,45 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
             token("InitVal")},
         7));
 
-    // InitVal → Exp | '{' [ InitVal { ',' InitVal } ] '}'
+    // InitVal → Exp
     rules->push_back(std::make_shared<ProductionRule>(
         "InitVal",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("Exp")},
         8));
+
+    // InitVal → '{' InitValListOpt '}'
     rules->push_back(std::make_shared<ProductionRule>(
         "InitVal",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("LBRACE"),
+            token("InitValListOpt"),
             token("RBRACE")},
         8));
+
+    // InitValListOpt -> InitVal InitValList | ε
     rules->push_back(std::make_shared<ProductionRule>(
-        "InitVal",
+        "InitValListOpt",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
-            token("LBRACE"),
             token("InitVal"),
-            token("RBRACE")},
+            token("InitValList")},
         8));
     rules->push_back(std::make_shared<ProductionRule>(
-        "InitVal",
+        "InitValListOpt",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{},
+        8));
+
+    // InitValList -> ',' InitVal InitValList | ε
+    rules->push_back(std::make_shared<ProductionRule>(
+        "InitValList",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
-            token("LBRACE"),
-            token("InitVal"),
             token("COMMA"),
             token("InitVal"),
-            token("RBRACE")},
+            token("InitValList")},
+        8));
+    rules->push_back(std::make_shared<ProductionRule>(
+        "InitValList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{},
         8));
 
     // FuncDef → FuncType Ident '(' [FuncFParams] ')' Block
@@ -274,18 +310,25 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
             token("INTTK")},
         11));
 
-    // FuncFParams → FuncFParam { ',' FuncFParam }
-    rules->push_back(std::make_shared<ProductionRule>(
-        "FuncFParams",
-        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
-            token("FuncFParam")},
-        12));
+    // FuncFParams → FuncFParam FuncFParamList
     rules->push_back(std::make_shared<ProductionRule>(
         "FuncFParams",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("FuncFParam"),
+            token("FuncFParamList")},
+        12));
+
+    // FuncFParamList → ',' FuncFParam FuncFParamList | ε
+    rules->push_back(std::make_shared<ProductionRule>(
+        "FuncFParamList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("COMMA"),
-            token("FuncFParam")},
+            token("FuncFParam"),
+            token("FuncFParamList")},
+        12));
+    rules->push_back(std::make_shared<ProductionRule>(
+        "FuncFParamList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{},
         12));
 
     // FuncFParam → BType Ident
@@ -544,18 +587,25 @@ std::shared_ptr<ProductionRuleList> createGrammarRules() {
             token("NOT")},
         23));
 
-    // FuncRParams → Exp { ',' Exp }
-    rules->push_back(std::make_shared<ProductionRule>(
-        "FuncRParams",
-        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
-            token("Exp")},
-        24));
+    // FuncRParams → Exp FuncRParamList
     rules->push_back(std::make_shared<ProductionRule>(
         "FuncRParams",
         std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("Exp"),
+            token("FuncRParamList")},
+        24));
+
+    // FuncRParamList → ',' Exp FuncRParamList | ε
+    rules->push_back(std::make_shared<ProductionRule>(
+        "FuncRParamList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{
             token("COMMA"),
-            token("Exp")},
+            token("Exp"),
+            token("FuncRParamList")},
+        24));
+    rules->push_back(std::make_shared<ProductionRule>(
+        "FuncRParamList",
+        std::vector<std::shared_ptr<Tokenizer::TokenDefinition>>{},
         24));
 
     // MulExp → UnaryExp | MulExp ('*' | '/' | '%') UnaryExp

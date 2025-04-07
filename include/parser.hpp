@@ -148,6 +148,8 @@ class Parser {
 
     // Helper function to print the current stack state
     void printStackState(const std::string& message) {
+        (void)message; // Mark 'message' as used to suppress warning
+        /* // Comment out standard logging, keep for explicit errors
         std::cerr << "\n=== Stack State ===" << std::endl;
         std::cerr << "Message: " << message << std::endl;
 
@@ -172,6 +174,7 @@ class Parser {
         std::cerr << "\nAST Stack size: " << astStack.size() << std::endl;
         std::cerr << "================\n"
                   << std::endl;
+        */
     }
 
     // Helper to check if a name is a known terminal
@@ -191,7 +194,7 @@ class Parser {
     // --- LR(1) Helper Functions ---
     // Computes and stores the FIRST sets for all non-terminals
     void computeFirstSets() {
-        std::cerr << "Computing FIRST sets..." << std::endl;
+        // std::cerr << "Computing FIRST sets..." << std::endl; // Commented out
         firstSets.clear();
         bool changed = true;
         // Nullptr represents epsilon
@@ -223,7 +226,7 @@ class Parser {
                     if (!symbol)
                         continue;  // Should not happen with valid grammar
                     const std::string& symbolName = symbol->name;
-                    bool symbolIsTerminal = isTerminal(symbolName);
+                    (void)symbolName; // Mark symbolName used if needed, or remove symbolIsTerminal
                     auto& symbolFirstSet = firstSets[symbolName];  // Get FIRST(symbol)
 
                     // Add FIRST(symbol) - {epsilon} to FIRST(nonTerminalName)
@@ -253,7 +256,7 @@ class Parser {
             }  // End loop through rules
         }  // End while changed
 
-        std::cerr << "Computed FIRST sets." << std::endl;
+        // std::cerr << "Computed FIRST sets." << std::endl; // Commented out
         // Optional: Print computed FIRST sets for debugging
         // for(const auto& pair : firstSets) { ... }
     }
@@ -378,7 +381,7 @@ class Parser {
 
     // Build the canonical collection of LR(1) states
     void buildStates() {
-        std::cerr << "Building LR(1) states..." << std::endl;
+        // std::cerr << "Building LR(1) states..." << std::endl; // Commented out
 
         // Start with the initial state based on the augmented grammar
         std::vector<LRItem> initialItems;
@@ -435,12 +438,12 @@ class Parser {
             }
         } while (changed);
 
-        std::cerr << "Built " << states.size() << " states" << std::endl;
+        // std::cerr << "Built " << states.size() << " states" << std::endl; // Commented out
     }
 
     // Build the action and goto tables
     void buildTables() {
-        std::cerr << "Building parsing tables..." << std::endl;
+        // std::cerr << "Building parsing tables..." << std::endl; // Commented out
         const std::string EOF_SYMBOL = "$EOF$";
 
         for (const auto& state : states) {
@@ -448,9 +451,11 @@ class Parser {
             state->gotoTable.clear();
 
             // --- Debugging Specific States --- START
-            bool debugState16 = (state->stateId == 16);
-            bool debugState121 = (state->stateId == 121);
-            bool debugState366 = (state->stateId == 366);
+            // Remove unused debug flag variables
+            // bool debugState16 = (state->stateId == 16);
+            // bool debugState121 = (state->stateId == 121);
+            // bool debugState366 = (state->stateId == 366);
+            /* // Comment out specific state debugging details
             if (debugState16 || debugState121 || debugState366) {
                 std::cerr << "\n--- Debugging State " << state->stateId << " ---" << std::endl;
                 std::cerr << "Items:" << std::endl;
@@ -473,6 +478,7 @@ class Parser {
                 }
                 std::cerr << "-------------------------" << std::endl;
             }
+            */
             // --- Debugging Specific States --- END
 
             // 1. Determine SHIFT actions and GOTO entries from transitions
@@ -484,47 +490,34 @@ class Parser {
                     continue;
 
                 bool is_terminal_check = isTerminal(symbolName);
-
-                // --- Debug logging for Specific States Transitions --- START
+                
+                /* // Comment out transition processing logs
                 if (debugState16 || debugState121 || debugState366) {
-                    std::cerr << "State " << state->stateId << ": Processing transition for Symbol: " << symbolName
-                              << ", Target State: " << targetState->stateId
-                              << ", IsTerminal: " << std::boolalpha << is_terminal_check << std::endl;
+                    std::cerr << "State " << state->stateId << ": Processing transition..." << std::endl;
                 }
-                // --- Debug logging for Specific States Transitions --- END
+                */
 
-                // Check if Terminal or Non-terminal using the helper function
                 if (is_terminal_check) {
-                    // --- Terminal: Potential SHIFT Action ---
                     Action shiftAction(ActionType::SHIFT, targetState->stateId);
                     auto existingActionIt = state->actions.find(symbolName);
                     if (existingActionIt == state->actions.end()) {
-                        // --- Debug logging for Specific States SHIFT add --- START
-                        if (debugState16 || debugState121 || debugState366)
-                            std::cerr << "State " << state->stateId << ": Adding initial SHIFT for " << symbolName << " to state " << targetState->stateId << std::endl;
-                        // --- Debug logging for Specific States SHIFT add --- END
+                        /* // Comment out initial SHIFT add log
+                         if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Adding initial SHIFT..." << std::endl;
+                         */
                         state->actions[symbolName] = shiftAction;
                     } else {
-                        // Conflict resolution
-                        // --- Debug logging for Specific States SHIFT conflict --- START
-                        if (debugState16 || debugState121 || debugState366)
-                            std::cerr << "State " << state->stateId << ": Conflict detected for SHIFT on " << symbolName << ". Existing action type: " << (int)existingActionIt->second.type << std::endl;
-                        // --- Debug logging for Specific States SHIFT conflict --- END
+                        /* // Comment out conflict detection log
+                         if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Conflict detected for SHIFT..." << std::endl;
+                         */
                         if (existingActionIt->second.type == ActionType::REDUCE) {
-                            // --- Debug logging for Specific States S/R conflict --- START
-                            if (debugState16 || debugState121 || debugState366)
-                                std::cerr << "State " << state->stateId << ": Shift/Reduce conflict for " << symbolName << ". Preferring SHIFT." << std::endl;
-                            // --- Debug logging for Specific States S/R conflict --- END
-                            state->actions[symbolName] = shiftAction;  // SHIFT wins
-                        } else if (existingActionIt->second.type == ActionType::SHIFT) {
-                            // Should not happen in a deterministic grammar/LR(1) table
-                            std::cerr << "CRITICAL ERROR: Shift/Shift conflict detected in State " << state->stateId
-                                      << " for symbol " << symbolName << "! Target1: " << existingActionIt->second.value
-                                      << ", Target2: " << shiftAction.value << std::endl;
+                           // std::cerr << "State " << state->stateId << ": Shift/Reduce conflict..." << std::endl; // Optionally keep S/R conflict log?
+                            state->actions[symbolName] = shiftAction; 
+                        } else if (existingActionIt->second.type == ActionType::SHIFT) { 
+                            // Keep Shift/Shift critical error log
+                            std::cerr << "CRITICAL ERROR: Shift/Shift conflict detected..." << std::endl;
                         }
                     }
                 } else {
-                    // --- Non-Terminal: Add to GOTO Table ---
                     state->gotoTable[symbolName] = targetState->stateId;
                 }
             }
@@ -532,115 +525,96 @@ class Parser {
             // 2. Determine REDUCE/ACCEPT actions from completed items
             for (const auto& item : state->items) {
                 if (item.isComplete()) {
-                    // --- Debug logging for Specific States completed items --- START
-                    if (debugState16 || debugState121 || debugState366)
-                        std::cerr << "State " << state->stateId << ": Checking completed item: " << item.rule->name << " -> ... . , Lookahead: " << (item.lookahead ? item.lookahead->name : "NULL") << std::endl;
-                    // --- Debug logging for Specific States completed items --- END
-
-                    // Check if this is the ACCEPT state: Rule is START -> CompUnit . and lookahead is $EOF$
+                    /* // Comment out completed item check log
+                    if (debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Checking completed item..." << std::endl;
+                    */
                     if (item.rule->name == "START" && item.lookahead == EOF_DEFINITION) {
-                        // --- ACCEPT Action ---
-                        Action acceptAction(ActionType::ACCEPT, 0);  // value is not used for ACCEPT
+                        Action acceptAction(ActionType::ACCEPT, 0);
                         std::string eofName = EOF_DEFINITION->name;
                         if (state->actions.count(eofName)) {
-                            // Conflict! (Should ideally not happen with a proper grammar)
-                            std::cerr << "Conflict (State " << state->stateId << ", Symbol " << eofName << "): ACCEPT vs existing "
-                                      << (int)state->actions[eofName].type << std::endl;
-                            // Decide conflict resolution (e.g., prefer ACCEPT? Log error?)
-                            // For now, let's overwrite with ACCEPT, but log it.
+                             std::cerr << "Conflict (State " << state->stateId << ", Symbol " << eofName << "): ACCEPT vs existing ..." << std::endl; // Keep Accept conflict
                         }
                         state->actions[eofName] = acceptAction;
-                        std::cerr << "  State " << state->stateId << ": Added ACCEPT for " << eofName << std::endl;
+                         // std::cerr << "  State " << state->stateId << ": Added ACCEPT for " << eofName << std::endl; // Comment out ACCEPT add log
                     }
-                    // Check if lookahead is valid before adding REDUCE action
-                    else if (item.lookahead && !item.lookahead->name.empty()) {
+                    else if (item.lookahead && !item.lookahead->name.empty()) { 
                         // --- REDUCE Action ---
+                        // Restore the ruleIndex finding logic:
                         int ruleIndex = -1;
-                        for (size_t i = 0; i < rules->size(); ++i) {
-                            if ((*rules)[i] == item.rule) {
-                                ruleIndex = i;
-                                break;
-                            }
+                        for(size_t i = 0; i < rules->size(); ++i) {
+                             if ((*rules)[i] == item.rule) {
+                                 ruleIndex = i;
+                                 break;
+                             }
                         }
                         if (ruleIndex == -1) {
-                            throw std::runtime_error("Could not find index for reduction rule: " + item.rule->name);
+                             // This should not happen if the item's rule is valid
+                             throw std::runtime_error("Internal Error: Could not find index for reduction rule: " + item.rule->name);
                         }
-
+                        // End of restored logic
+                        
                         Action reduceAction(ActionType::REDUCE, ruleIndex);
                         std::string lookaheadName = item.lookahead->name;
                         auto existingActionIt = state->actions.find(lookaheadName);
-
-                        // --- Debug logging for Specific States REDUCE check --- START
-                        if (debugState16 || debugState121 || debugState366)
-                            std::cerr << "State " << state->stateId << ": Considering REDUCE for lookahead " << lookaheadName << " by rule " << ruleIndex << " (" << item.rule->name << ")" << std::endl;
-                        // --- Debug logging for Specific States REDUCE check --- END
-
+                        /* // Comment out REDUCE check log
+                        if (debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Considering REDUCE..." << std::endl;
+                        */
                         if (existingActionIt == state->actions.end()) {
-                            // --- Debug logging for Specific States REDUCE add --- START
-                            if (debugState16 || debugState121 || debugState366)
-                                std::cerr << "State " << state->stateId << ": Adding initial REDUCE for " << lookaheadName << " (Rule " << ruleIndex << ")" << std::endl;
-                            // --- Debug logging for Specific States REDUCE add --- END
+                            /* // Comment out initial REDUCE add log
+                             if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Adding initial REDUCE..." << std::endl;
+                            */
                             state->actions[lookaheadName] = reduceAction;
                         } else {
-                            // --- Debug logging for Specific States REDUCE conflict --- START
-                            if (debugState16 || debugState121 || debugState366)
-                                std::cerr << "State " << state->stateId << ": Conflict detected for REDUCE on " << lookaheadName << ". Existing action type: " << (int)existingActionIt->second.type << ", Existing value: " << existingActionIt->second.value << ", New rule: " << ruleIndex << std::endl;
-                            // --- Debug logging for Specific States REDUCE conflict --- END
-                            // --- Conflict Resolution (Reduce vs existing) ---
+                           /* // Comment out conflict detection log
+                             if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Conflict detected for REDUCE..." << std::endl;
+                            */
                             if (existingActionIt->second.type == ActionType::SHIFT) {
-                                // Shift/Reduce conflict: logged above, SHIFT wins (do nothing here)
+                                // S/R conflict handled/logged above
                             } else if (existingActionIt->second.type == ActionType::REDUCE) {
-                                // Reduce/Reduce conflict
-                                std::cerr << "Reduce/Reduce conflict (State " << state->stateId << ", Symbol " << lookaheadName << "): Existing Rule " << existingActionIt->second.value << ", New Rule " << reduceAction.value << std::endl;
-                                // Resolve based on rule priority (e.g., lower index/priority wins)
-                                // Assuming lower rule index means higher priority (defined earlier)
-                                if (reduceAction.value < existingActionIt->second.value) {
+                                std::cerr << "Reduce/Reduce conflict (State " << state->stateId << "...)" << std::endl; // Keep R/R conflict
+                                if (reduceAction.value < existingActionIt->second.value) { 
                                     std::cerr << "  >> Preferring new REDUCE rule " << reduceAction.value << std::endl;
                                     state->actions[lookaheadName] = reduceAction;
                                 }
-                            } else {
-                                // Accept/Reduce or Error/Reduce conflict (should ideally not happen)
-                                std::cerr << "Unhandled conflict (State " << state->stateId << ", Symbol " << lookaheadName << "): Existing " << (int)existingActionIt->second.type << " vs REDUCE rule " << reduceAction.value << std::endl;
+                            } else { 
+                                 std::cerr << "Unhandled conflict (State " << state->stateId << "...)" << std::endl; // Keep other conflicts
                             }
                         }
                     }
-                }  // End if item.isComplete()
-            }  // End loop through items
+                } // End if item.isComplete()
+            } // End loop through items
 
-            // --- Debugging Specific States Final Actions --- START
+            /* // Comment out final action/GOTO table debugging
             if (debugState16 || debugState121 || debugState366) {
-                std::cerr << "\n--- Final Actions for State " << state->stateId << " ---" << std::endl;
-                for (const auto& pair : state->actions) {
-                    std::cerr << "  Symbol: " << pair.first
-                              << ", Action: " << (int)pair.second.type
-                              << ", Value: " << pair.second.value << std::endl;
-                }
-                std::cerr << "--- GOTO Table for State " << state->stateId << " ---" << std::endl;
-                for (const auto& pair : state->gotoTable) {
-                    std::cerr << "  Symbol: " << pair.first << " -> State " << pair.second << std::endl;
-                }
-                std::cerr << "--------------------------------\n"
-                          << std::endl;
+                 std::cerr << "\n--- Final Actions for State " << state->stateId << " ---" << std::endl;
+                 for (const auto& pair : state->actions) {
+                     std::cerr << "  Symbol: " << pair.first
+                               << ", Action: " << (int)pair.second.type
+                               << ", Value: " << pair.second.value << std::endl;
+                 }
+                 std::cerr << "--- GOTO Table for State " << state->stateId << " ---" << std::endl;
+                 for (const auto& pair : state->gotoTable) {
+                     std::cerr << "  Symbol: " << pair.first << " -> State " << pair.second << std::endl;
+                 }
+                 std::cerr << "--------------------------------\n" << std::endl;
             }
-            // --- Debugging Specific States Final Actions --- END
-
-            // --- Debugging State 0 Final Actions --- (Keep this)
             if (state->stateId == 0) {
-                std::cerr << "\n--- Final Actions for State 0 ---" << std::endl;
-                for (const auto& pair : state->actions) {
-                    std::cerr << "  Symbol: " << pair.first
-                              << ", Action: " << (int)pair.second.type
-                              << ", Value: " << pair.second.value << std::endl;
-                }
-                std::cerr << "--------------------------------\n"
-                          << std::endl;
+                 std::cerr << "\n--- Final Actions for State 0 ---" << std::endl;
+                 for (const auto& pair : state->actions) {
+                     std::cerr << "  Symbol: " << pair.first
+                               << ", Action: " << (int)pair.second.type
+                               << ", Value: " << pair.second.value << std::endl;
+                 }
+                 std::cerr << "--------------------------------\n" << std::endl;
             }
-        }  // End loop through states
-        std::cerr << "Built parsing tables" << std::endl;
+            */
+            
+        } // End loop through states
+        // std::cerr << "Built parsing tables" << std::endl; // Commented out
     }
 
     void shift(std::shared_ptr<Tokenizer::Token> token) {
-        std::cerr << "Shifting token: " << token->definition->name << " -> " << token->matched << std::endl;
+        // std::cerr << "Shifting token: " << token->definition->name << " -> " << token->matched << std::endl; // Commented out
 
         auto currentStateId = stateStack.back();
         auto currentState = states[currentStateId];
@@ -658,11 +632,11 @@ class Parser {
         astStack.push_back(std::make_shared<AST::TerminalNode>(token));
         stateStack.push_back(action.value);
 
-        std::cerr << "Shifted to state " << action.value << std::endl;
+        // std::cerr << "Shifted to state " << action.value << std::endl; // Commented out
     }
 
     void reduce(std::shared_ptr<ProductionRule> rule) {
-        std::cerr << "Reducing by rule: " << rule->name << std::endl;
+        // std::cerr << "Reducing by rule: " << rule->name << std::endl; // Commented out
 
         // Pop the right-hand side
         std::vector<std::shared_ptr<Tokenizer::Token>> matchedTokens;
@@ -704,7 +678,7 @@ class Parser {
         int nextStateId = gotoIt->second;
         stateStack.push_back(nextStateId);
 
-        std::cerr << "Reduced. New state: " << nextStateId << std::endl;
+        // std::cerr << "Reduced. New state: " << nextStateId << std::endl; // Commented out
     }
 
    public:
@@ -725,7 +699,7 @@ class Parser {
     }
 
     std::shared_ptr<AST::Node> parse(std::shared_ptr<Tokenizer::TokenList> tokens) {
-        std::cerr << "Starting parse with " << tokens->size() << " tokens:" << std::endl;
+        // std::cerr << "Starting parse with " << tokens->size() << " tokens:" << std::endl; // Commented out
 
         // Initialize stacks
         stateStack.clear();
@@ -770,12 +744,13 @@ class Parser {
 
         // Loop indefinitely until ACCEPT or ERROR
         while (true) {
-            int currentStateId = stateStack.back();  // Use int for consistency with State ID type
-            if (currentStateId < 0 || currentStateId >= states.size()) {
-                printStackState("Error: Invalid state ID on stack");
-                throw ParseError(scanContext, "Invalid state ID encountered: " + std::to_string(currentStateId));
+            int currentStateId_int = stateStack.back(); // Keep as int for stack type
+            // Perform comparison with explicit cast to avoid warning
+            if (currentStateId_int < 0 || static_cast<size_t>(currentStateId_int) >= states.size()) { 
+                 printStackState("Error: Invalid state ID on stack");
+                 throw ParseError(scanContext, "Invalid state ID encountered: " + std::to_string(currentStateId_int));
             }
-            auto currentState = states[currentStateId];
+            auto currentState = states[currentStateId_int];
 
             // Basic validation for currentToken (should always be valid here)
             if (!currentToken || !currentToken->definition) {
@@ -783,8 +758,8 @@ class Parser {
                 throw ParseError(scanContext, "Internal error: Invalid token.");
             }
 
-            std::cerr << "State " << currentStateId << ", ";
-            std::cerr << "next token: " << currentToken->definition->name << " -> " << currentToken->matched;
+            // std::cerr << "State " << currentStateId << ", "; // Commented out
+            // std::cerr << "next token: " << currentToken->definition->name << " -> " << currentToken->matched; // Commented out
 
             // Find action in the table using the *currentToken*
             Action action;
@@ -793,14 +768,14 @@ class Parser {
 
             if (actionIt == currentState->actions.end()) {
                 printStackState("Error: No action found for token \'" + actionKey + "\'");
-                throw ParseError(scanContext, "Unexpected token \'" + currentToken->matched + "\' (" + actionKey + ") in state " + std::to_string(currentStateId));
+                throw ParseError(scanContext, "Unexpected token \'" + currentToken->matched + "\' (" + actionKey + ") in state " + std::to_string(currentStateId_int));
             }
             action = actionIt->second;
 
-            std::cerr << ", action: ";
+            // std::cerr << ", action: "; // Commented out
             switch (action.type) {
                 case ActionType::SHIFT:
-                    std::cerr << "SHIFT to " << action.value;
+                    // std::cerr << "SHIFT to " << action.value; // Commented out
                     shift(currentToken);
                     // Consume input: Fetch the next token ONLY IF NOT EOF
                     if (currentToken->definition != EOF_DEFINITION) {  // Check if we just shifted EOF
@@ -816,17 +791,17 @@ class Parser {
                     break;
 
                 case ActionType::REDUCE:
-                    std::cerr << "REDUCE by rule " << action.value;
-                    if (action.value < 0 || action.value >= rules->size()) {
-                        printStackState("Error: Invalid rule index for reduction");
-                        throw ParseError(scanContext, "Invalid rule index " + std::to_string(action.value) + " for reduction.");
+                    // std::cerr << "REDUCE by rule " << action.value; // Commented out
+                    // Perform comparison with explicit cast to avoid warning
+                    if (action.value < 0 || static_cast<size_t>(action.value) >= rules->size()) {
+                         printStackState("Error: Invalid rule index for reduction");
+                         throw ParseError(scanContext, "Invalid rule index " + std::to_string(action.value) + " for reduction.");
                     }
                     reduce((*rules)[action.value]);
-                    // Do not consume input token (currentToken remains the same for next iteration)
                     break;
 
                 case ActionType::ACCEPT:
-                    std::cerr << "ACCEPT";
+                    // std::cerr << "ACCEPT"; // Commented out
                     // In this specific implementation (ACCEPT after shifting EOF),
                     // the stack should contain [..., CompUnit_Node, EOF_Node].
                     // We want the CompUnit_Node, which is the second-to-last element.
@@ -836,24 +811,21 @@ class Parser {
                     }
                     // Get the CompUnit node (second to last)
                     astRoot = astStack[astStack.size() - 2];
-                    std::cerr << std::endl;
-                    return astRoot;
+                    // std::cerr << std::endl; // Commented out (moved below)
+                    return astRoot; 
 
                 case ActionType::ERROR:
                 default:
-                    printStackState("Error: Table entry is ERROR");
-                    throw ParseError(scanContext, "Syntax error encountered on token \'" + currentToken->matched + "\' in state " + std::to_string(currentStateId));
+                    // Error logging happens via printStackState & exception
+                    printStackState("Error: Table entry is ERROR or Invalid Action"); 
+                    throw ParseError(scanContext, "Syntax error encountered on token \'" + currentToken->matched + "\' in state " + std::to_string(currentStateId_int));
             }
-            std::cerr << std::endl;  // Newline after action output
+            // std::cerr << std::endl; // Newline after action output // Commented out
 
         }  // End while loop (while(true))
         // --- Revised Loop Logic --- END
     }
 };
-
-// Define the static EOF definition outside the class
-std::shared_ptr<Tokenizer::TokenDefinition> Parser::EOF_DEFINITION =
-    std::make_shared<Tokenizer::TokenDefinition>("$EOF$", nullptr, nullptr, nullptr, -1);  // Use a distinct name
 
 // Define the grammar rules
 std::shared_ptr<ProductionRuleList> createGrammarRules();

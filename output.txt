@@ -1,5 +1,4 @@
 INTTK int
-<FuncType>
 MAINTK main
 LPARENT (
 RPARENT )
@@ -7,6 +6,7 @@ LBRACE {
 INTTK int
 IDENFR c
 <VarDef>
+<VarDeclList>
 SEMICN ;
 <VarDecl>
 IDENFR c
@@ -15,10 +15,6 @@ ASSIGN =
 GETINTTK getint
 LPARENT (
 RPARENT )
-<UnaryExp>
-<MulExp>
-<AddExp>
-<Exp>
 SEMICN ;
 <Stmt>
 PRINTFTK printf
@@ -45,11 +41,12 @@ IDENFR c
 <Exp>
 SEMICN ;
 <Stmt>
-<BlockItems>
-<BlockItems>
-<BlockItems>
-<BlockItems>
-<BlockItems>
+<BlockItemsOpt>
+<BlockItemsOpt>
+<BlockItemsOpt>
+<BlockItemsOpt>
+<BlockItemsOpt>
 RBRACE }
 <Block>
 <MainFuncDef>
+<CompUnit>

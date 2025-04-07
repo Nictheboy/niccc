@@ -39,6 +39,8 @@ std::string readFile(const std::string& filename) {
 }
 
 int main(int argc, char* argv[]) {
+    (void)argc; // Mark argc as unused
+    (void)argv; // Mark argv as unused
     std::string filename = "testfile.txt";
     std::string input = readFile(filename);
     ScanContext scanContext(filename);
@@ -67,6 +69,8 @@ int main(int argc, char* argv[]) {
         std::cout << "Parsing successful!" << std::endl;
         std::cout << "\nAST:" << std::endl;
         std::cout << astRoot->toString() << std::endl;
+        std::ofstream outputFile("output.txt");
+        traverseAST(astRoot, outputFile);
     } catch (const CompilerError& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

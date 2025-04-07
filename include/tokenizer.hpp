@@ -386,7 +386,7 @@ class Tokenizer {
     }
 
     std::shared_ptr<TokenList> parse(std::string str, std::string filename) {
-        std::cerr << "Tokenizer input: '" << str << "'" << std::endl;
+        // std::cerr << "Tokenizer input: '" << str << "'" << std::endl; // Commented out
         ScanContext scanContext(filename);
         auto machine = StatusMachine(definitions, scanContext);
         std::string currentToken;
@@ -395,18 +395,18 @@ class Tokenizer {
         machine.onCharAcceptted.AddListener([&](char c) {
             currentToken += c;
             currentRow += c;
-            std::cerr << "Accepted char: '" << c << "'" << std::endl;
+            // std::cerr << "Accepted char: '" << c << "'" << std::endl; // Commented out
         });
         machine.onTokenCommitted.AddListener([&](std::shared_ptr<TokenDefinition> committedToken) {
             Token token;
             token.definition = committedToken;
             token.matched = currentToken;
             tokenList->push_back(token);
-            std::cerr << "Committed token: " << token.definition->name << " -> '" << token.matched << "'" << std::endl;
+            // std::cerr << "Committed token: " << token.definition->name << " -> '" << token.matched << "'" << std::endl; // Commented out
             currentToken.clear();
         });
         for (char c : str) {
-            std::cerr << "Processing char: '" << c << "'" << std::endl;
+            // std::cerr << "Processing char: '" << c << "'" << std::endl; // Commented out
             while (!machine.next(c))
                 ;
             if (c == '\n') {
@@ -416,7 +416,7 @@ class Tokenizer {
             }
         }
         machine.next('\0');
-        std::cerr << "Tokenizer produced " << tokenList->size() << " tokens" << std::endl;
+        // std::cerr << "Tokenizer produced " << tokenList->size() << " tokens" << std::endl; // Commented out
         return tokenList;
     }
 };
