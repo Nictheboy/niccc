@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 #include "ast.hpp"
@@ -16,8 +17,47 @@ namespace Parser {
 
 class ParseError : public CompilerError {
    public:
-    ParseError(ScanContext& scanContext, const std::string& message)
-        : CompilerError(scanContext, "parse error: " + message) {}
+    // Store error details
+    std::string errorMessage;
+
+    // Constructor takes token, state ID, and stack info
+    ParseError(ScanContext& context,
+               const Tokenizer::Token& errorToken,
+               int stateId,
+               const std::string& stackInfo,
+               const std::string& contextMessage)
+        : CompilerError(context, "parse error")  // Initialize base correctly
+    {
+        // Construct the detailed message
+        std::stringstream ss;
+        ss << "parse error: " << contextMessage << " '"
+           << errorToken.matched << "' (" << errorToken.definition->name << ")";
+        if (errorToken.start_row > 0 && errorToken.start_col > 0) {  // Check if position is valid
+            ss << " near line " << errorToken.start_row << ", column " << errorToken.start_col;
+        }
+        ss << " in state " << stateId << ".";
+        ss << stackInfo;  // Append stack state string
+        errorMessage = ss.str();
+    }
+
+    // Constructor for errors not tied to a specific token (e.g., internal errors)
+    ParseError(ScanContext& context,
+               const std::string& generalMessage,
+               const std::string& stackInfo)
+        : CompilerError(context, "parse error")  // Initialize base correctly
+    {
+        std::stringstream ss;
+        ss << "parse error: " << generalMessage;
+        ss << stackInfo;
+        errorMessage = ss.str();
+    }
+
+    // Override what() to return the detailed message
+    const char* what() const noexcept override {
+        // CompilerError base class might store its own message,
+        // but we return our more detailed one.
+        return errorMessage.c_str();
+    }
 };
 
 class ProductionRule;
@@ -147,34 +187,33 @@ class Parser {
     // --- End LR(1) Construction Data ---
 
     // Helper function to print the current stack state
-    void printStackState(const std::string& message) {
-        (void)message; // Mark 'message' as used to suppress warning
-        /* // Comment out standard logging, keep for explicit errors
-        std::cerr << "\n=== Stack State ===" << std::endl;
-        std::cerr << "Message: " << message << std::endl;
+    // Modify to return a string instead of printing directly
+    std::string getStackStateString(const std::string& contextMessage) {
+        std::stringstream ss;
+        ss << "\n=== Stack State Context: " << contextMessage << " ===\n";
+        const int titleWidth = ss.str().length() - 2;
 
-        std::cerr << "\nSymbol Stack:" << std::endl;
+        ss << "Symbol Stack (" << symbolStack.size() << "):";
         for (const auto& token : symbolStack) {
-            if (token && token->definition) {  // Added check for definition
-                std::cerr << token->definition->name << " ";
+            if (token && token->definition) {
+                ss << " " << token->definition->name;  // Print symbol name
             } else if (token) {
-                std::cerr << "<Token without definition?> ";
+                ss << " <NoDef?>";
             } else {
-                std::cerr << "NULL ";
+                ss << " NULL";
             }
         }
-        std::cerr << std::endl;
+        ss << "\n";
 
-        std::cerr << "\nState Stack:" << std::endl;
-        for (const auto& state : stateStack) {
-            std::cerr << state << " ";
+        ss << "State Stack (" << stateStack.size() << "):";
+        for (const auto& stateId : stateStack) {
+            ss << " " << stateId;
         }
-        std::cerr << std::endl;
+        ss << "\n";
 
-        std::cerr << "\nAST Stack size: " << astStack.size() << std::endl;
-        std::cerr << "================\n"
-                  << std::endl;
-        */
+        ss << "AST Stack size: " << astStack.size() << "\n";
+        ss << std::string(titleWidth, '=') << "\n";
+        return ss.str();
     }
 
     // Helper to check if a name is a known terminal
@@ -226,7 +265,7 @@ class Parser {
                     if (!symbol)
                         continue;  // Should not happen with valid grammar
                     const std::string& symbolName = symbol->name;
-                    (void)symbolName; // Mark symbolName used if needed, or remove symbolIsTerminal
+                    (void)symbolName;                              // Mark symbolName used if needed, or remove symbolIsTerminal
                     auto& symbolFirstSet = firstSets[symbolName];  // Get FIRST(symbol)
 
                     // Add FIRST(symbol) - {epsilon} to FIRST(nonTerminalName)
@@ -490,7 +529,7 @@ class Parser {
                     continue;
 
                 bool is_terminal_check = isTerminal(symbolName);
-                
+
                 /* // Comment out transition processing logs
                 if (debugState16 || debugState121 || debugState366) {
                     std::cerr << "State " << state->stateId << ": Processing transition..." << std::endl;
@@ -510,9 +549,9 @@ class Parser {
                          if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Conflict detected for SHIFT..." << std::endl;
                          */
                         if (existingActionIt->second.type == ActionType::REDUCE) {
-                           // std::cerr << "State " << state->stateId << ": Shift/Reduce conflict..." << std::endl; // Optionally keep S/R conflict log?
-                            state->actions[symbolName] = shiftAction; 
-                        } else if (existingActionIt->second.type == ActionType::SHIFT) { 
+                            // std::cerr << "State " << state->stateId << ": Shift/Reduce conflict..." << std::endl; // Optionally keep S/R conflict log?
+                            state->actions[symbolName] = shiftAction;
+                        } else if (existingActionIt->second.type == ActionType::SHIFT) {
                             // Keep Shift/Shift critical error log
                             std::cerr << "CRITICAL ERROR: Shift/Shift conflict detected..." << std::endl;
                         }
@@ -532,27 +571,26 @@ class Parser {
                         Action acceptAction(ActionType::ACCEPT, 0);
                         std::string eofName = EOF_DEFINITION->name;
                         if (state->actions.count(eofName)) {
-                             std::cerr << "Conflict (State " << state->stateId << ", Symbol " << eofName << "): ACCEPT vs existing ..." << std::endl; // Keep Accept conflict
+                            std::cerr << "Conflict (State " << state->stateId << ", Symbol " << eofName << "): ACCEPT vs existing ..." << std::endl;  // Keep Accept conflict
                         }
                         state->actions[eofName] = acceptAction;
-                         // std::cerr << "  State " << state->stateId << ": Added ACCEPT for " << eofName << std::endl; // Comment out ACCEPT add log
-                    }
-                    else if (item.lookahead && !item.lookahead->name.empty()) { 
+                        // std::cerr << "  State " << state->stateId << ": Added ACCEPT for " << eofName << std::endl; // Comment out ACCEPT add log
+                    } else if (item.lookahead && !item.lookahead->name.empty()) {
                         // --- REDUCE Action ---
                         // Restore the ruleIndex finding logic:
                         int ruleIndex = -1;
-                        for(size_t i = 0; i < rules->size(); ++i) {
-                             if ((*rules)[i] == item.rule) {
-                                 ruleIndex = i;
-                                 break;
-                             }
+                        for (size_t i = 0; i < rules->size(); ++i) {
+                            if ((*rules)[i] == item.rule) {
+                                ruleIndex = i;
+                                break;
+                            }
                         }
                         if (ruleIndex == -1) {
-                             // This should not happen if the item's rule is valid
-                             throw std::runtime_error("Internal Error: Could not find index for reduction rule: " + item.rule->name);
+                            // This should not happen if the item's rule is valid
+                            throw std::runtime_error("Internal Error: Could not find index for reduction rule: " + item.rule->name);
                         }
                         // End of restored logic
-                        
+
                         Action reduceAction(ActionType::REDUCE, ruleIndex);
                         std::string lookaheadName = item.lookahead->name;
                         auto existingActionIt = state->actions.find(lookaheadName);
@@ -565,24 +603,24 @@ class Parser {
                             */
                             state->actions[lookaheadName] = reduceAction;
                         } else {
-                           /* // Comment out conflict detection log
-                             if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Conflict detected for REDUCE..." << std::endl;
-                            */
+                            /* // Comment out conflict detection log
+                              if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Conflict detected for REDUCE..." << std::endl;
+                             */
                             if (existingActionIt->second.type == ActionType::SHIFT) {
                                 // S/R conflict handled/logged above
                             } else if (existingActionIt->second.type == ActionType::REDUCE) {
-                                std::cerr << "Reduce/Reduce conflict (State " << state->stateId << "...)" << std::endl; // Keep R/R conflict
-                                if (reduceAction.value < existingActionIt->second.value) { 
+                                std::cerr << "Reduce/Reduce conflict (State " << state->stateId << "...)" << std::endl;  // Keep R/R conflict
+                                if (reduceAction.value < existingActionIt->second.value) {
                                     std::cerr << "  >> Preferring new REDUCE rule " << reduceAction.value << std::endl;
                                     state->actions[lookaheadName] = reduceAction;
                                 }
-                            } else { 
-                                 std::cerr << "Unhandled conflict (State " << state->stateId << "...)" << std::endl; // Keep other conflicts
+                            } else {
+                                std::cerr << "Unhandled conflict (State " << state->stateId << "...)" << std::endl;  // Keep other conflicts
                             }
                         }
                     }
-                } // End if item.isComplete()
-            } // End loop through items
+                }  // End if item.isComplete()
+            }  // End loop through items
 
             /* // Comment out final action/GOTO table debugging
             if (debugState16 || debugState121 || debugState366) {
@@ -608,8 +646,8 @@ class Parser {
                  std::cerr << "--------------------------------\n" << std::endl;
             }
             */
-            
-        } // End loop through states
+
+        }  // End loop through states
         // std::cerr << "Built parsing tables" << std::endl; // Commented out
     }
 
@@ -624,7 +662,7 @@ class Parser {
         auto actionIt = currentState->actions.find(tokenName);
         if (actionIt == currentState->actions.end() || actionIt->second.type != ActionType::SHIFT) {
             this->printStackState("Error during shift - no shift action found for " + tokenName);
-            throw ParseError(scanContext, "Expected shift action for token " + tokenName + " in state " + std::to_string(currentStateId));
+            throw ParseError(scanContext, *token, currentStateId, getStackStateString("Error during shift"), "Error during shift");
         }
         Action action = actionIt->second;  // Action found via find
 
@@ -718,7 +756,8 @@ class Parser {
                 auto& token = (*tokens)[token_idx];
                 if (!token.definition) {  // Basic validation
                     printStackState("Error: Token has null definition during fetch");
-                    throw ParseError(scanContext, "Token at index " + std::to_string(token_idx) + " has no definition.");
+                    throw ParseError(scanContext, "Token at index " + std::to_string(token_idx) + " has no definition.",
+                                     getStackStateString("Invalid Token"));
                 }
                 if (token.definition->name != "WHITESPACE") {
                     return std::make_shared<Tokenizer::Token>(token);
@@ -735,7 +774,8 @@ class Parser {
             } else {
                 // We already generated and processed EOF, should have ACCEPTed or ERRORed
                 printStackState("Error: Trying to fetch token after EOF was processed.");
-                throw ParseError(scanContext, "Internal parser error: processing past EOF.");
+                throw ParseError(scanContext, "Internal parser error: processing past EOF.",
+                                 getStackStateString("EOF Processing"));
             }
         };
 
@@ -744,18 +784,16 @@ class Parser {
 
         // Loop indefinitely until ACCEPT or ERROR
         while (true) {
-            int currentStateId_int = stateStack.back(); // Keep as int for stack type
-            // Perform comparison with explicit cast to avoid warning
-            if (currentStateId_int < 0 || static_cast<size_t>(currentStateId_int) >= states.size()) { 
-                 printStackState("Error: Invalid state ID on stack");
-                 throw ParseError(scanContext, "Invalid state ID encountered: " + std::to_string(currentStateId_int));
+            int currentStateId_int = stateStack.back();  // Keep as int for stack type
+            if (currentStateId_int < 0 || static_cast<size_t>(currentStateId_int) >= states.size()) {
+                throw ParseError(scanContext, "Invalid state ID encountered: " + std::to_string(currentStateId_int),
+                                 getStackStateString("Invalid State ID"));
             }
             auto currentState = states[currentStateId_int];
 
-            // Basic validation for currentToken (should always be valid here)
             if (!currentToken || !currentToken->definition) {
-                printStackState("Error: currentToken or its definition is null before action lookup");
-                throw ParseError(scanContext, "Internal error: Invalid token.");
+                throw ParseError(scanContext, "Internal error: Invalid token.",
+                                 getStackStateString("Invalid Token"));
             }
 
             // std::cerr << "State " << currentStateId << ", "; // Commented out
@@ -767,8 +805,10 @@ class Parser {
             auto actionIt = currentState->actions.find(actionKey);
 
             if (actionIt == currentState->actions.end()) {
-                printStackState("Error: No action found for token \'" + actionKey + "\'");
-                throw ParseError(scanContext, "Unexpected token \'" + currentToken->matched + "\' (" + actionKey + ") in state " + std::to_string(currentStateId_int));
+                throw ParseError(scanContext, *currentToken,
+                                 currentStateId_int,
+                                 getStackStateString("Unexpected Token"),
+                                 "Unexpected token");
             }
             action = actionIt->second;
 
@@ -792,10 +832,9 @@ class Parser {
 
                 case ActionType::REDUCE:
                     // std::cerr << "REDUCE by rule " << action.value; // Commented out
-                    // Perform comparison with explicit cast to avoid warning
                     if (action.value < 0 || static_cast<size_t>(action.value) >= rules->size()) {
-                         printStackState("Error: Invalid rule index for reduction");
-                         throw ParseError(scanContext, "Invalid rule index " + std::to_string(action.value) + " for reduction.");
+                        throw ParseError(scanContext, "Invalid rule index " + std::to_string(action.value) + " for reduction.",
+                                         getStackStateString("Invalid Rule Index"));
                     }
                     reduce((*rules)[action.value]);
                     break;
@@ -806,24 +845,33 @@ class Parser {
                     // the stack should contain [..., CompUnit_Node, EOF_Node].
                     // We want the CompUnit_Node, which is the second-to-last element.
                     if (astStack.size() < 2) {
-                        printStackState("Error: AST stack has less than 2 elements on ACCEPT");
-                        throw ParseError(scanContext, "Internal error: AST stack state invalid on ACCEPT.");
+                        throw ParseError(scanContext, "Internal error: AST stack state invalid on ACCEPT.",
+                                         getStackStateString("Invalid Stack on Accept"));
                     }
                     // Get the CompUnit node (second to last)
                     astRoot = astStack[astStack.size() - 2];
                     // std::cerr << std::endl; // Commented out (moved below)
-                    return astRoot; 
+                    return astRoot;
 
                 case ActionType::ERROR:
                 default:
-                    // Error logging happens via printStackState & exception
-                    printStackState("Error: Table entry is ERROR or Invalid Action"); 
-                    throw ParseError(scanContext, "Syntax error encountered on token \'" + currentToken->matched + "\' in state " + std::to_string(currentStateId_int));
+                    throw ParseError(scanContext, *currentToken,
+                                     currentStateId_int,
+                                     getStackStateString("Syntax Error from Table"),
+                                     "Syntax error encountered on token");
             }
             // std::cerr << std::endl; // Newline after action output // Commented out
 
         }  // End while loop (while(true))
         // --- Revised Loop Logic --- END
+    }
+
+    // Error printing function (can call getStackStateString)
+    void printStackState(const std::string& message) {
+        // This can still be used for explicit debug printing if needed,
+        // but error messages will use getStackStateString directly.
+        (void)message;  // Mark 'message' as used to suppress warning
+                        // std::cerr << getStackStateString(message); // Example usage
     }
 };
 

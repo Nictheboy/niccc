@@ -6,7 +6,7 @@
 namespace Parser {
 
 // Define the static member here
-std::shared_ptr<Tokenizer::TokenDefinition> Parser::EOF_DEFINITION = 
+std::shared_ptr<Tokenizer::TokenDefinition> Parser::EOF_DEFINITION =
     std::make_shared<Tokenizer::TokenDefinition>("$EOF$", nullptr, nullptr, nullptr, -1);
 
 // Map to store canonical TokenDefinition pointers for grammar symbols

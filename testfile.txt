@@ -21,5 +21,5 @@ int main(){
     c = getint();
     d = getint();
     e = getint();
-    e = -e + c * d - a % b + c / (a + b) + sum(a, b)
+    e = -e + c * d - a % b + c / (a + b) + sum(a, b);
 } 

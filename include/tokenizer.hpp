@@ -114,6 +114,7 @@ class StatusMachine {
    public:
     StatusMachine(std::shared_ptr<TokenDefinitionList> definitions, ScanContext& scanContext)
         : definitions(definitions), scanContext(scanContext) {
+        (void)this->scanContext;  // Mark as unused for now
         for (auto definition : *definitions) {
             definition->end->onMatch.AddListener([definition, this]() {
                 committableTokensNewCharNotAccepted.push_back(definition);
@@ -372,6 +373,8 @@ class TokenDefinitionBuilder : public std::enable_shared_from_this<TokenDefiniti
 struct Token {
     std::shared_ptr<TokenDefinition> definition;
     std::string matched;
+    int start_row = -1;
+    int start_col = -1;
 };
 
 using TokenList = std::vector<Token>;
@@ -389,33 +392,64 @@ class Tokenizer {
         // std::cerr << "Tokenizer input: '" << str << "'" << std::endl; // Commented out
         ScanContext scanContext(filename);
         auto machine = StatusMachine(definitions, scanContext);
-        std::string currentToken;
-        std::string currentRow;
+        std::string currentTokenStr;
         auto tokenList = std::make_shared<TokenList>();
+
+        int currentTokenStartRow = scanContext.row;
+        int currentTokenStartCol = scanContext.column;
+        bool buildingToken = false;  // Flag to track if we are actively building a token
+
         machine.onCharAcceptted.AddListener([&](char c) {
-            currentToken += c;
-            currentRow += c;
-            // std::cerr << "Accepted char: '" << c << "'" << std::endl; // Commented out
+            if (!buildingToken) {  // Start of a new token
+                currentTokenStartRow = scanContext.row;
+                currentTokenStartCol = scanContext.column;
+                buildingToken = true;
+            }
+            currentTokenStr += c;
+            // Update position *after* processing char, before potential commit
+            // Column update happens later in the main loop
         });
-        machine.onTokenCommitted.AddListener([&](std::shared_ptr<TokenDefinition> committedToken) {
+
+        machine.onTokenCommitted.AddListener([&](std::shared_ptr<TokenDefinition> committedTokenDef) {
             Token token;
-            token.definition = committedToken;
-            token.matched = currentToken;
-            tokenList->push_back(token);
+            token.definition = committedTokenDef;
+            token.matched = currentTokenStr;
+            token.start_row = currentTokenStartRow;
+            token.start_col = currentTokenStartCol;
+            // Only add non-whitespace/comment tokens to the final list for the parser
+            if (committedTokenDef->name != "WHITESPACE" && committedTokenDef->name != "COMMENT") {
+                tokenList->push_back(token);
+            }
             // std::cerr << "Committed token: " << token.definition->name << " -> '" << token.matched << "'" << std::endl; // Commented out
-            currentToken.clear();
+            currentTokenStr.clear();
+            buildingToken = false;  // Reset for the next token
+            // Start position for the *next* token will be set when its first char is accepted
         });
+
         for (char c : str) {
             // std::cerr << "Processing char: '" << c << "'" << std::endl; // Commented out
+
+            // Remember position *before* machine potentially accepts it
+            int charRow = scanContext.row;
+            int charCol = scanContext.column;
+            if (!buildingToken) {  // If not building, this char *might* start a token
+                currentTokenStartRow = charRow;
+                currentTokenStartCol = charCol;
+            }
+
+            // Process the character
             while (!machine.next(c))
-                ;
+                ;  // Loop if char wasn't accepted but caused a commit
+
+            // Update scan context position *after* processing the character
             if (c == '\n') {
                 scanContext.row++;
-                scanContext.column = 0;
-                currentRow.clear();
+                scanContext.column = 1;  // Reset column to 1 for the new line
+            } else {
+                scanContext.column++;  // Increment column for non-newline chars
             }
         }
-        machine.next('\0');
+        machine.next('\0');  // Process EOF to commit any final token
         // std::cerr << "Tokenizer produced " << tokenList->size() << " tokens" << std::endl; // Commented out
         return tokenList;
     }
