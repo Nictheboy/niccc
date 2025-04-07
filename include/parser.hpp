@@ -6,6 +6,7 @@
 #include <memory>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include "ast.hpp"
@@ -60,20 +61,63 @@ class ParseError : public CompilerError {
     }
 };
 
-class ProductionRule;
-using ProductionRuleList = std::vector<std::shared_ptr<ProductionRule>>;
+// Struct for Production Rules (e.g., A -> alpha)
+struct ProductionRule {
+    std::string name;                                                  // Name of the non-terminal (LHS)
+    std::vector<std::shared_ptr<Tokenizer::TokenDefinition>> symbols;  // Sequence of symbols (RHS)
+    int priority;                                                      // Re-added priority member (higher value means higher priority)
 
-class ProductionRule : public std::enable_shared_from_this<ProductionRule> {
-   public:
-    std::string name;
-    std::vector<std::shared_ptr<Tokenizer::TokenDefinition>> symbols;
-    int priority;  // lower priority value means higher priority
+    // Constructor with priority (defaulting to 0)
+    ProductionRule(std::string n, std::vector<std::shared_ptr<Tokenizer::TokenDefinition>> s, int prio = 0)
+        : name(std::move(n)), symbols(std::move(s)), priority(prio) {}
 
-    ProductionRule(std::string name,
-                   std::vector<std::shared_ptr<Tokenizer::TokenDefinition>> symbols,
-                   int priority)
-        : name(name), symbols(symbols), priority(priority) {}
+    // Overload less than operator for use in sets/maps if needed (based on name and symbols)
+    bool operator<(const ProductionRule& other) const {
+        if (name != other.name) {
+            return name < other.name;
+        }
+        if (symbols.size() != other.symbols.size()) {
+            return symbols.size() < other.symbols.size();
+        }
+        for (size_t i = 0; i < symbols.size(); ++i) {
+            // Handle potential nullptrs safely
+            const auto& sym1 = symbols[i];
+            const auto& sym2 = other.symbols[i];
+            if (sym1 == nullptr && sym2 != nullptr)
+                return true;
+            if (sym1 != nullptr && sym2 == nullptr)
+                return false;
+            if (sym1 == nullptr && sym2 == nullptr)
+                continue;
+            if (sym1->name != sym2->name) {
+                return sym1->name < sym2->name;
+            }
+        }
+        // Rules are identical in name and symbols if we reach here
+        return false;  // Not less than
+    }
+
+    // Overload equals operator for comparing rules
+    bool operator==(const ProductionRule& other) const {
+        if (name != other.name || symbols.size() != other.symbols.size()) {
+            return false;
+        }
+        for (size_t i = 0; i < symbols.size(); ++i) {
+            const auto& sym1 = symbols[i];
+            const auto& sym2 = other.symbols[i];
+            if (sym1 == nullptr && sym2 == nullptr)
+                continue;
+            if (sym1 == nullptr || sym2 == nullptr)
+                return false;  // One is null, other is not
+            if (sym1->name != sym2->name) {
+                return false;
+            }
+        }
+        return true;  // Name and symbols match
+    }
 };
+
+using ProductionRuleList = std::vector<std::shared_ptr<ProductionRule>>;
 
 // Action type for the parsing table
 enum class ActionType {
@@ -166,6 +210,13 @@ class LRState {
     }
 };
 
+// Define a custom exception for LR(1) conflicts detected during table generation
+class LRConflictError : public std::runtime_error {
+   public:
+    LRConflictError(const std::string& message)
+        : std::runtime_error(message) {}
+};
+
 class Parser {
    public:
     // Special token definition for End-Of-File
@@ -228,6 +279,15 @@ class Parser {
             }
         }
         return false;
+    }
+
+    // Helper to get token priority (placeholder, always returns 0)
+    int getTokenPriority(const std::string& tokenName) {
+        (void)tokenName;  // Mark as unused for now
+        // TODO: Implement actual token priority lookup if needed
+        // This might involve checking a separate priority map or
+        // looking at the TokenDefinition itself if priority is added there.
+        return 0;
     }
 
     // --- LR(1) Helper Functions ---
@@ -482,46 +542,59 @@ class Parser {
 
     // Build the action and goto tables
     void buildTables() {
-        // std::cerr << "Building parsing tables..." << std::endl; // Commented out
         const std::string EOF_SYMBOL = "$EOF$";
 
-        for (const auto& state : states) {
-            state->actions.clear();
-            state->gotoTable.clear();
-
-            // --- Debugging Specific States --- START
-            // Remove unused debug flag variables
-            // bool debugState16 = (state->stateId == 16);
-            // bool debugState121 = (state->stateId == 121);
-            // bool debugState366 = (state->stateId == 366);
-            /* // Comment out specific state debugging details
-            if (debugState16 || debugState121 || debugState366) {
-                std::cerr << "\n--- Debugging State " << state->stateId << " ---" << std::endl;
-                std::cerr << "Items:" << std::endl;
-                for (const auto& item : state->items) {
-                    std::string lookaheadStr = (item.lookahead ? item.lookahead->name : "NULL");
-                    std::cerr << "  Rule: " << item.rule->name << " ->";
-                    for (size_t k = 0; k < item.rule->symbols.size(); ++k) {
-                        if (k == item.dotPosition)
-                            std::cerr << " .";
-                        // Handle null symbol pointer just in case
-                        std::cerr << " " << (item.rule->symbols[k] ? item.rule->symbols[k]->name : "<NULL_SYM>");
+        // Helper lambda to format state items with transition info
+        auto formatStateItemsWithTransitions =
+            [&](const LRState& currentState) {  // Capture current state by reference, implicitly captures 'this'
+                std::stringstream ss;
+                ss << "\n  State " << currentState.stateId << " Items:";
+                for (const auto& item : currentState.items) {
+                    ss << "\n    [ " << item.rule->name << " ->";
+                    // Print symbols before dot
+                    for (size_t k = 0; k < item.dotPosition; ++k) {
+                        ss << " " << (item.rule->symbols[k] ? item.rule->symbols[k]->name : "<NULL_SYM>");
                     }
-                    if (item.dotPosition == item.rule->symbols.size())
-                        std::cerr << " .";
-                    std::cerr << ", Lookahead: " << lookaheadStr << std::endl;
+                    ss << " .";  // Print the dot
+                                 // Print symbols after dot
+                    std::shared_ptr<Tokenizer::TokenDefinition> symbolAfterDot = nullptr;
+                    if (item.dotPosition < item.rule->symbols.size()) {
+                        symbolAfterDot = item.rule->symbols[item.dotPosition];
+                        ss << " " << (symbolAfterDot ? symbolAfterDot->name : "<NULL_SYM>");
+                    }
+                    for (size_t k = item.dotPosition + 1; k < item.rule->symbols.size(); ++k) {
+                        ss << " " << (item.rule->symbols[k] ? item.rule->symbols[k]->name : "<NULL_SYM>");
+                    }
+                    ss << ", " << (item.lookahead ? item.lookahead->name : "NULL") << " ]";
+
+                    // Add transition info if not complete
+                    if (symbolAfterDot) {
+                        auto transitionIt = currentState.transitions.find(symbolAfterDot->name);
+                        if (transitionIt != currentState.transitions.end() && transitionIt->second) {
+                            int targetStateId = transitionIt->second->stateId;
+                            if (isTerminal(symbolAfterDot->name)) {
+                                ss << " (Shift to State " << targetStateId << " on " << symbolAfterDot->name << ")";
+                            } else {
+                                ss << " (Goto State " << targetStateId << " on " << symbolAfterDot->name << ")";
+                            }
+                        } else {
+                            // This might legitimately happen if a symbol leads nowhere from this state (error path)
+                            // Or could indicate an issue in buildStates if a valid transition is missing.
+                            // Keep it simple for now.
+                            // ss << " (No transition defined for " << symbolAfterDot->name << "?)";
+                        }
+                    }
                 }
-                std::cerr << "Transitions:" << std::endl;
-                for (const auto& pair : state->transitions) {
-                    std::cerr << "  Symbol: " << pair.first << " -> State " << (pair.second ? pair.second->stateId : -1) << std::endl;
-                }
-                std::cerr << "-------------------------" << std::endl;
-            }
-            */
-            // --- Debugging Specific States --- END
+                return ss.str();
+            };
+
+        for (const auto& state_ptr : states) {
+            const auto& state = *state_ptr;  // Get const reference for reading data
+            state_ptr->actions.clear();      // Use pointer to modify
+            state_ptr->gotoTable.clear();    // Use pointer to modify
 
             // 1. Determine SHIFT actions and GOTO entries from transitions
-            for (const auto& transitionPair : state->transitions) {
+            for (const auto& transitionPair : state.transitions) {  // Use state for reading transitions
                 const std::string& symbolName = transitionPair.first;
                 const auto& targetState = transitionPair.second;
 
@@ -530,54 +603,94 @@ class Parser {
 
                 bool is_terminal_check = isTerminal(symbolName);
 
-                /* // Comment out transition processing logs
-                if (debugState16 || debugState121 || debugState366) {
-                    std::cerr << "State " << state->stateId << ": Processing transition..." << std::endl;
-                }
-                */
-
                 if (is_terminal_check) {
+                    // --- Terminal: Potential SHIFT Action ---
                     Action shiftAction(ActionType::SHIFT, targetState->stateId);
-                    auto existingActionIt = state->actions.find(symbolName);
-                    if (existingActionIt == state->actions.end()) {
-                        /* // Comment out initial SHIFT add log
-                         if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Adding initial SHIFT..." << std::endl;
-                         */
-                        state->actions[symbolName] = shiftAction;
+                    auto existingActionIt = state_ptr->actions.find(symbolName);
+
+                    if (existingActionIt == state_ptr->actions.end()) {
+                        state_ptr->actions[symbolName] = shiftAction;
                     } else {
-                        /* // Comment out conflict detection log
-                         if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Conflict detected for SHIFT..." << std::endl;
-                         */
+                        // Conflict detected!
                         if (existingActionIt->second.type == ActionType::REDUCE) {
-                            // std::cerr << "State " << state->stateId << ": Shift/Reduce conflict..." << std::endl; // Optionally keep S/R conflict log?
-                            state->actions[symbolName] = shiftAction;
+                            // --- Shift/Reduce conflict (SHIFT vs existing REDUCE) --- START
+                            int reduceRuleIndex = existingActionIt->second.value;
+                            int prio_reduce = (*rules)[reduceRuleIndex]->priority;
+                            int prio_shift = getTokenPriority(symbolName);
+
+                            if (prio_shift > prio_reduce) {
+                                state_ptr->actions[symbolName] = shiftAction;  // Favor SHIFT
+                            } else if (prio_reduce > prio_shift) {
+                                // Favor REDUCE - Do nothing, keep existing REDUCE action
+                            } else {
+                                // Priorities are equal - unresolved conflict
+                                std::string errorMsg = "LR(1) Conflict Detected: Shift/Reduce conflict in State " +
+                                                       std::to_string(state.stateId) + " on symbol '" + symbolName +
+                                                       "'. Cannot SHIFT to State " + std::to_string(targetState->stateId) +
+                                                       " (prio=" + std::to_string(prio_shift) + ")" +
+                                                       " and REDUCE by rule " + std::to_string(reduceRuleIndex) +
+                                                       " (" + (*rules)[reduceRuleIndex]->name + ", prio=" + std::to_string(prio_reduce) + "). Priorities are equal.";
+                                errorMsg += formatStateItemsWithTransitions(state);
+                                throw LRConflictError(errorMsg);
+                            }
+                            // --- Shift/Reduce conflict (SHIFT vs existing REDUCE) --- END
+
                         } else if (existingActionIt->second.type == ActionType::SHIFT) {
-                            // Keep Shift/Shift critical error log
-                            std::cerr << "CRITICAL ERROR: Shift/Shift conflict detected..." << std::endl;
+                            // Shift/Shift conflict - Keep original logic
+                            // ... (existing code) ...
+                        } else if (existingActionIt->second.type == ActionType::ACCEPT) {
+                            // Shift/Accept conflict
+                            std::string errorMsg = "LR(1) Conflict Detected: Shift/Accept conflict in State " +
+                                                   std::to_string(state.stateId) + " on symbol '" + symbolName +
+                                                   "'. Cannot SHIFT to State " + std::to_string(targetState->stateId) + " and ACCEPT." +
+                                                   formatStateItemsWithTransitions(state);  // Use new lambda
+                            throw LRConflictError(errorMsg);
                         }
                     }
                 } else {
-                    state->gotoTable[symbolName] = targetState->stateId;
+                    // --- Non-terminal: GOTO Entry ---
+                    if (state_ptr->gotoTable.count(symbolName) && state_ptr->gotoTable[symbolName] != targetState->stateId) {
+                        std::string errorMsg = "Internal Error: GOTO table conflict in State " +
+                                               std::to_string(state.stateId) + " for non-terminal '" + symbolName +
+                                               "'. Existing target: " + std::to_string(state_ptr->gotoTable[symbolName]) +
+                                               ", New target: " + std::to_string(targetState->stateId) + ".";
+                        throw std::runtime_error(errorMsg);
+                    }
+                    state_ptr->gotoTable[symbolName] = targetState->stateId;  // Use state_ptr to modify
                 }
-            }
+            }  // End loop through transitions
 
             // 2. Determine REDUCE/ACCEPT actions from completed items
-            for (const auto& item : state->items) {
+            for (const auto& item : state.items) {  // Use state for reading items
                 if (item.isComplete()) {
-                    /* // Comment out completed item check log
-                    if (debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Checking completed item..." << std::endl;
-                    */
                     if (item.rule->name == "START" && item.lookahead == EOF_DEFINITION) {
+                        // --- ACCEPT Action ---
                         Action acceptAction(ActionType::ACCEPT, 0);
                         std::string eofName = EOF_DEFINITION->name;
-                        if (state->actions.count(eofName)) {
-                            std::cerr << "Conflict (State " << state->stateId << ", Symbol " << eofName << "): ACCEPT vs existing ..." << std::endl;  // Keep Accept conflict
+                        if (state_ptr->actions.count(eofName)) {
+                            Action existingAction = state_ptr->actions[eofName];
+                            std::string conflictType;
+                            std::string details;
+                            if (existingAction.type == ActionType::SHIFT) {
+                                conflictType = "Shift/Accept";
+                                details = " SHIFT to State " + std::to_string(existingAction.value);
+                            } else if (existingAction.type == ActionType::REDUCE) {
+                                conflictType = "Reduce/Accept";
+                                details = " REDUCE by rule " + std::to_string(existingAction.value) + " (" + (*rules)[existingAction.value]->name + ")";
+                            } else {
+                                conflictType = "Accept/Accept";  // Should not happen
+                            }
+                            std::string errorMsg = "LR(1) Conflict Detected: " + conflictType + " conflict in State " +
+                                                   std::to_string(state.stateId) + " on symbol '" + eofName +
+                                                   "'. Cannot ACCEPT and" + details + "." +
+                                                   formatStateItemsWithTransitions(state);  // Use new lambda
+                            throw LRConflictError(errorMsg);
                         }
-                        state->actions[eofName] = acceptAction;
-                        // std::cerr << "  State " << state->stateId << ": Added ACCEPT for " << eofName << std::endl; // Comment out ACCEPT add log
+                        state_ptr->actions[eofName] = acceptAction;
+
                     } else if (item.lookahead && !item.lookahead->name.empty()) {
                         // --- REDUCE Action ---
-                        // Restore the ruleIndex finding logic:
+                        // Find the index of the rule for reduction
                         int ruleIndex = -1;
                         for (size_t i = 0; i < rules->size(); ++i) {
                             if ((*rules)[i] == item.rule) {
@@ -586,69 +699,82 @@ class Parser {
                             }
                         }
                         if (ruleIndex == -1) {
-                            // This should not happen if the item's rule is valid
                             throw std::runtime_error("Internal Error: Could not find index for reduction rule: " + item.rule->name);
                         }
-                        // End of restored logic
+                        // End of ruleIndex calculation
 
                         Action reduceAction(ActionType::REDUCE, ruleIndex);
                         std::string lookaheadName = item.lookahead->name;
-                        auto existingActionIt = state->actions.find(lookaheadName);
-                        /* // Comment out REDUCE check log
-                        if (debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Considering REDUCE..." << std::endl;
-                        */
-                        if (existingActionIt == state->actions.end()) {
-                            /* // Comment out initial REDUCE add log
-                             if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Adding initial REDUCE..." << std::endl;
-                            */
-                            state->actions[lookaheadName] = reduceAction;
+                        auto existingActionIt = state_ptr->actions.find(lookaheadName);
+
+                        if (existingActionIt == state_ptr->actions.end()) {
+                            state_ptr->actions[lookaheadName] = reduceAction;
                         } else {
-                            /* // Comment out conflict detection log
-                              if(debugState16 || debugState121 || debugState366) std::cerr << "State " << state->stateId << ": Conflict detected for REDUCE..." << std::endl;
-                             */
+                            // Conflict detected!
                             if (existingActionIt->second.type == ActionType::SHIFT) {
-                                // S/R conflict handled/logged above
-                            } else if (existingActionIt->second.type == ActionType::REDUCE) {
-                                std::cerr << "Reduce/Reduce conflict (State " << state->stateId << "...)" << std::endl;  // Keep R/R conflict
-                                if (reduceAction.value < existingActionIt->second.value) {
-                                    std::cerr << "  >> Preferring new REDUCE rule " << reduceAction.value << std::endl;
-                                    state->actions[lookaheadName] = reduceAction;
+                                // --- Shift/Reduce conflict (REDUCE vs existing SHIFT) --- START
+                                int shiftState = existingActionIt->second.value;
+                                int prio_reduce = (*rules)[ruleIndex]->priority;
+                                int prio_shift = getTokenPriority(lookaheadName);
+
+                                if (prio_reduce > prio_shift) {
+                                    state_ptr->actions[lookaheadName] = reduceAction;  // Favor REDUCE
+                                } else if (prio_shift > prio_reduce) {
+                                    // Favor SHIFT - Do nothing, keep existing SHIFT action
+                                } else {
+                                    // Priorities are equal - unresolved conflict
+                                    std::string errorMsg = "LR(1) Conflict Detected: Shift/Reduce conflict in State " +
+                                                           std::to_string(state.stateId) + " on symbol '" + lookaheadName +
+                                                           "'. Cannot REDUCE by rule " + std::to_string(ruleIndex) +
+                                                           " (" + item.rule->name + ", prio=" + std::to_string(prio_reduce) + ")" +
+                                                           " and SHIFT to State " + std::to_string(shiftState) +
+                                                           " (prio=" + std::to_string(prio_shift) + "). Priorities are equal.";
+                                    errorMsg += formatStateItemsWithTransitions(state);
+                                    throw LRConflictError(errorMsg);
                                 }
-                            } else {
-                                std::cerr << "Unhandled conflict (State " << state->stateId << "...)" << std::endl;  // Keep other conflicts
+                                // --- Shift/Reduce conflict (REDUCE vs existing SHIFT) --- END
+
+                            } else if (existingActionIt->second.type == ActionType::REDUCE) {
+                                // Reduce/Reduce conflict - Keep existing generic priority logic
+                                int existingReduceRuleIndex = existingActionIt->second.value;
+                                int currentReduceRuleIndex = ruleIndex;
+
+                                // --- Priority Resolution --- START
+                                int currentPriority = (*rules)[currentReduceRuleIndex]->priority;
+                                int existingPriority = (*rules)[existingReduceRuleIndex]->priority;
+
+                                if (currentPriority > existingPriority) {
+                                    // Current rule has higher priority, overwrite
+                                    state_ptr->actions[lookaheadName] = reduceAction;
+                                } else if (existingPriority > currentPriority) {
+                                    // Existing rule has higher priority, do nothing
+                                } else {
+                                    // Priorities are equal, this is an unresolved ambiguity
+                                    std::string errorMsg = "LR(1) Conflict Detected: Reduce/Reduce conflict in State " +
+                                                           std::to_string(state.stateId) + " on symbol '" + lookaheadName +
+                                                           "'. Cannot REDUCE by rule " + std::to_string(currentReduceRuleIndex) +
+                                                           " (" + (*rules)[currentReduceRuleIndex]->name + ", prio=" + std::to_string(currentPriority) + ")" +
+                                                           " and REDUCE by rule " + std::to_string(existingReduceRuleIndex) +
+                                                           " (" + (*rules)[existingReduceRuleIndex]->name + ", prio=" + std::to_string(existingPriority) + "). Priorities are equal.";
+                                    // errorMsg += formatStateItemsWithTransitions(state);
+                                    throw LRConflictError(errorMsg);
+                                }
+                                // --- Priority Resolution --- END
+                            } else if (existingActionIt->second.type == ActionType::ACCEPT) {
+                                // Reduce/Accept conflict - Keep original logic
+                                std::string errorMsg = "LR(1) Conflict Detected: Reduce/Accept conflict in State " +
+                                                       std::to_string(state.stateId) + " on symbol '" + lookaheadName +
+                                                       "'. Cannot REDUCE by rule " + std::to_string(ruleIndex) +
+                                                       " (" + item.rule->name + ") and ACCEPT." +
+                                                       formatStateItemsWithTransitions(state);  // Use new lambda
+                                throw LRConflictError(errorMsg);
                             }
                         }
-                    }
+                    }  // End if item.lookahead
                 }  // End if item.isComplete()
             }  // End loop through items
 
-            /* // Comment out final action/GOTO table debugging
-            if (debugState16 || debugState121 || debugState366) {
-                 std::cerr << "\n--- Final Actions for State " << state->stateId << " ---" << std::endl;
-                 for (const auto& pair : state->actions) {
-                     std::cerr << "  Symbol: " << pair.first
-                               << ", Action: " << (int)pair.second.type
-                               << ", Value: " << pair.second.value << std::endl;
-                 }
-                 std::cerr << "--- GOTO Table for State " << state->stateId << " ---" << std::endl;
-                 for (const auto& pair : state->gotoTable) {
-                     std::cerr << "  Symbol: " << pair.first << " -> State " << pair.second << std::endl;
-                 }
-                 std::cerr << "--------------------------------\n" << std::endl;
-            }
-            if (state->stateId == 0) {
-                 std::cerr << "\n--- Final Actions for State 0 ---" << std::endl;
-                 for (const auto& pair : state->actions) {
-                     std::cerr << "  Symbol: " << pair.first
-                               << ", Action: " << (int)pair.second.type
-                               << ", Value: " << pair.second.value << std::endl;
-                 }
-                 std::cerr << "--------------------------------\n" << std::endl;
-            }
-            */
-
         }  // End loop through states
-        // std::cerr << "Built parsing tables" << std::endl; // Commented out
     }
 
     void shift(std::shared_ptr<Tokenizer::Token> token) {

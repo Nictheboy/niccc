@@ -17,8 +17,13 @@ void traverseAST(std::shared_ptr<AST::Node> node, std::ofstream& outputFile) {
         }
 
         // Output syntax component name if it's not one of the excluded types
-        if (nonTerminal->name != "BlockItem" &&
+        if (nonTerminal->name != "CompUnitOpt" &&
+            nonTerminal->name != "BlockItemsOpt" &&
+            nonTerminal->name != "FuncFParamList" &&
+            nonTerminal->name != "FuncRParamList" &&
+            nonTerminal->name != "BlockItem" &&
             nonTerminal->name != "Decl" &&
+            nonTerminal->name != "VarDeclList" &&
             nonTerminal->name != "BType") {
             outputFile << "<" << nonTerminal->name << ">" << std::endl;
         }
@@ -39,8 +44,8 @@ std::string readFile(const std::string& filename) {
 }
 
 int main(int argc, char* argv[]) {
-    (void)argc; // Mark argc as unused
-    (void)argv; // Mark argv as unused
+    (void)argc;  // Mark argc as unused
+    (void)argv;  // Mark argv as unused
     std::string filename = "testfile.txt";
     std::string input = readFile(filename);
     ScanContext scanContext(filename);
