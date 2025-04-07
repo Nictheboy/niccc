@@ -422,6 +422,6 @@ class Tokenizer {
 };
 
 // Define the tokenizer
-std::shared_ptr<Tokenizer> createTokenizer();
+std::pair<std::shared_ptr<Tokenizer>, std::shared_ptr<TokenDefinitionList>> createTokenizer();
 
 }  // namespace Tokenizer

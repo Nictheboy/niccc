@@ -2,7 +2,7 @@
 
 namespace Tokenizer {
 
-std::shared_ptr<Tokenizer> createTokenizer() {
+std::pair<std::shared_ptr<Tokenizer>, std::shared_ptr<TokenDefinitionList>> createTokenizer() {
     auto rules = std::make_shared<TokenDefinitionList>();
     rules->push_back(std::make_shared<TokenDefinitionBuilder>()
                          ->name("WHITESPACE")
@@ -131,7 +131,7 @@ std::shared_ptr<Tokenizer> createTokenizer() {
     declare("LBRACE", "{");
     declare("RBRACE", "}");
     auto tokenizer = std::make_shared<Tokenizer>(rules);
-    return tokenizer;
+    return {tokenizer, rules};
 }
 
 }  // namespace Tokenizer

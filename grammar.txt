@@ -1,0 +1,105 @@
+2025 年编译器课程设计文法如下（详见文档“文法说明.pdf”《2025编译技术实验文法定义及相关说明》）：
+
+    补充更新内容：
+
+    1. 数组不能作为参数传递；
+
+    2. 相邻的 UnaryOp 不能相同，如 i = --+4; 是不符合语义约束的；
+
+    3. UnaryOp 为 '!' 时只能出现在条件表达式中；
+
+    4. ConstExp -> AddExp 这条规则所涉及的 Ident 必须为常量；
+
+    5. printf 语句中的转义字符有且仅有 '\n'，即为了与 gcc 评测结果保持一致， '\' 不能单独出现（将视为不符合文法），只可以与 'n' 结对出现。
+
+    6. 为了简化后续同学们开发编译器的难度，有返回值的函数的最后一个 <stmt> 一定是 return 语句（注意是 <FuncDef> 中 <Block> 的最后一个语句）
+
+    7. 对于整数数字的要求：不含前导0，但数字 0 是合法的。
+
+    8. main 函数的返回值只能为 0。
+
+    【提示】有不少同学的错误在于输入输出不匹配，输出文件的行尾缺少本应该输出的空格。这种情况请用电脑自带的文本编辑器来保存文件并上传，有的 IDE 如 jetbrain 那一套，保存后会自动抹去行尾空格，造成输出不一致的问题。
+
+    编译单元 CompUnit → {Decl} {FuncDef} MainFuncDef  // 1.是否存在Decl 2.是否存在FuncDef
+
+    声明 Decl → ConstDecl | VarDecl // 覆盖两种声明
+
+    常量声明 ConstDecl → 'const' BType ConstDef { ',' ConstDef } ';' // 1.花括号内重复0次 2.花括号内重复多次
+
+    基本类型 BType → 'int' // 存在即可
+
+    常数定义 ConstDef → Ident [ '[' ConstExp ']' ] '=' ConstInitVal  // 包含普通变量、一维数组两种情况
+
+    常量初值 ConstInitVal → ConstExp
+        | '{' [ ConstInitVal { ',' ConstInitVal } ] '}' // 1.常表达式初值 2.一维数组初值
+
+    变量声明 VarDecl → BType VarDef { ',' VarDef } ';' // 1.花括号内重复0次 2.花括号内重复多次
+
+    变量定义 VarDef → Ident [ '[' ConstExp ']' ] // 包含普通变量、一维数组定义
+        | Ident [ '[' ConstExp ']' ] '=' InitVal
+
+    变量初值 InitVal → Exp | '{' [ InitVal { ',' InitVal } ] '}'// 1.表达式初值 2.一维数组初值
+
+    函数定义 FuncDef → FuncType Ident '(' [FuncFParams] ')' Block // 1.无形参 2.有形参
+
+    主函数定义 MainFuncDef → 'int' 'main' '(' ')' Block // 存在main函数
+
+    函数类型 FuncType → 'void' | 'int' // 覆盖两种类型的函数
+
+    函数形参表 FuncFParams → FuncFParam { ',' FuncFParam } // 1.花括号内重复0次 2.花括号内重复多次
+
+    函数形参 FuncFParam → BType Ident // 只包含普通变量
+
+    语句块 Block → '{' { BlockItem } '}' // 1.花括号内重复0次 2.花括号内重复多次
+
+    语句块项 BlockItem → Decl | Stmt // 覆盖两种语句块项
+
+    语句 Stmt → LVal '=' Exp ';' // 每种类型的语句都要覆盖
+        | [Exp] ';'  //有无Exp两种情况
+        | Block 
+        | 'if' '( Cond ')' Stmt [ 'else' Stmt ] // 1.有else 2.无else
+        | 'while' '(' Cond ')' Stmt
+        | 'break' ';' | 'continue' ';'
+        | 'return' [Exp] ';' // 1.有Exp 2.无Exp
+        | LVal = 'getint''('')'';'
+        | 'printf' '('FormatString {',' Exp} ')'';' // 1.有Exp 2.无Exp
+
+    表达式 Exp → AddExp 注：SysY 表达式是int 型表达式 // 存在即可
+
+    条件表达式 Cond → LOrExp // 存在即可
+
+    左值表达式 LVal → Ident ['[' Exp ']'] //1.普通变量 2.一维数组
+
+    基本表达式 PrimaryExp → '(' Exp ')' | LVal | Number // 三种情况均需覆盖
+
+    数值 Number → IntConst // 存在即可
+
+    一元表达式 UnaryExp → PrimaryExp | Ident '(' [FuncRParams] ')' // 三种情况均需覆盖,函数调用也需要覆盖FuncRParams的不同情况
+        | UnaryOp UnaryExp // 存在即可
+
+    单目运算符 UnaryOp → '+' | '−' | '!' 注：'!'仅出现在条件表达式中 // 三种均需覆盖
+
+    函数实参表 FuncRParams → Exp { ',' Exp } // 1.花括号内重复0次 2.花括号内重复多次
+
+    乘除模表达式 MulExp → UnaryExp | MulExp ('*' | '/' | '%') UnaryExp // 1.UnaryExp 2.* 3./ 4.% 均需覆盖
+
+    加减表达式 AddExp → MulExp | AddExp ('+' | '−') MulExp // 1.MulExp 2.+ 3.- 均需覆盖
+
+    关系表达式 RelExp → AddExp | RelExp ('<' | '>' | '<=' | '>=') AddExp // 1.AddExp 2.< 3.> 4.<= 5.>= 均需覆盖
+
+    相等性表达式 EqExp → RelExp | EqExp ('==' | '!=') RelExp // 1.RelExp 2.== 3.!= 均需覆盖
+
+    逻辑与表达式 LAndExp → EqExp | LAndExp '&&' EqExp // 1.EqExp 2.&& 均需覆盖
+
+    逻辑或表达式 LOrExp → LAndExp | LOrExp '||' LAndExp // 1.LAndExp 2.|| 均需覆盖
+
+    常量表达式 ConstExp → AddExp 注：使用的Ident 必须是常量 // 存在即可
+
+    格式化字符 FormatChar → %d
+
+    普通字符 NormalChar → 十进制编码为32,33,40-126的ASCII字符
+
+    字符 Char → FormatChar | NormalChar 
+
+    格式化字符串 FormatString → '"'{ Char }'"'
+
