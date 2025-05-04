@@ -95,7 +95,6 @@ std::pair<std::shared_ptr<Tokenizer>, std::shared_ptr<TokenDefinitionList>> crea
                              ->appendString(content)
                              ->build());
     };
-    declare("MAINTK", "main");
     declare("CONSTTK", "const");
     declare("INTTK", "int");
     declare("BREAKTK", "break");
@@ -106,8 +105,6 @@ std::pair<std::shared_ptr<Tokenizer>, std::shared_ptr<TokenDefinitionList>> crea
     declare("AND", "&&");
     declare("OR", "||");
     declare("WHILETK", "while");
-    declare("GETINTTK", "getint");
-    declare("PRINTFTK", "printf");
     declare("RETURNTK", "return");
     declare("PLUS", "+");
     declare("MINU", "-");

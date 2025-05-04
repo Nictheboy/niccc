@@ -1,18 +1,11 @@
+const int ident = 1;
+int array[10] = {1, 2, 3, 4};
+
 int add(int a, int b) {
     return a + b;
 }
 
-int sub(int a, int b) {
-    return a - b;
-}
-
-int mul(int a, int b) {
-    return a * b;
-}
-
-int div(int a, int b) {
-    return a / b;
-}
+void nop() {}
 
 int main(){
     int a, b, c, d, e, result = 0;
@@ -21,7 +14,10 @@ int main(){
     c = getint();
     d = getint();
     e = getint();
-    e = -e + c * d - a % b + c / (a + b) + sum(a, b);
+    nop();
+    e = -e + c * d - a % b + c / (a + b) + add(a, b);
+    array[0] = e + ident;
     printf("%d, %d, %d\n", a, b, c);
+    printf("%d\n", array[0] - ident);
     return 0;
 } 
