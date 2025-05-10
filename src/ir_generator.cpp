@@ -658,6 +658,15 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
         else if (terminal_child->token->matched == "if") { // Added for if statement
             this->visitIfStmt(stmtNode);
         }
+        else if (terminal_child->token->matched == "while") { 
+            this->visitWhileStmt(stmtNode);
+        }
+        else if (terminal_child->token->matched == "break") { 
+            this->visitBreakStmt(stmtNode);
+        }
+        else if (terminal_child->token->matched == "continue") { 
+            this->visitContinueStmt(stmtNode);
+        }
         else {
             std::cerr << "[IR_GEN] visitStmt: Unhandled keyword-based statement start: " << terminal_child->token->matched << std::endl;
         }
@@ -797,7 +806,7 @@ std::vector<std::shared_ptr<IR::IROperand>> IRGenerator::visitFuncRParams(PNNode
 
             if (!comma_node || !comma_node->token || comma_node->token->matched != ",") {
                 std::cerr << "[IR_GEN_ERR] visitFuncRParams: Expected COMMA in FuncRParamsFollowing, but found: "
-                          << (comma_node && comma_node->token ? comma_node->token->matched : "<not a comma or missing token>") << std::endl;
+                          << (comma_node && comma_node->token ? comma_node->token->matched : "<not_a_comma_or_missing_token>") << std::endl;
                 break;  // Malformed, stop processing arguments
             }
 
@@ -1437,6 +1446,7 @@ IRGenerator::IRGenerator()
     : program(nullptr), currentNormalFunction(nullptr), tempVarCounter(0), labelCounter(0) {  // Initialize program and currentNormalFunction to nullptr
     // program = std::make_shared<IR::IRProgram>(); // Usually done in generate()
     // defineBuiltinPureFunctions(); // If you have this method for pre-populating pure functions
+    loopLabelStack.clear(); // Initialize loop label stack
 }
 
 std::shared_ptr<IR::IRProgram> IRGenerator::generate(PNode rootAstNode) {
@@ -2014,6 +2024,102 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitEqExp(PNNode node) {
     }
     std::cerr << "[IR_GEN] visitEqExp: Final result: " << current_lhs_operand->toString() << std::endl;
     return current_lhs_operand;
+}
+
+void IRGenerator::visitWhileStmt(PNNode node) {
+    std::cerr << "[IR_GEN] visitWhileStmt() called for node: " << (node ? node->name : "null") << " with " << (node ? node->children.size() : 0) << " children." << std::endl;
+    if (!currentNormalFunction) {
+        std::cerr << "[IR_GEN_ERR] visitWhileStmt: No current function context." << std::endl;
+        return;
+    }
+    // AST for while: Stmt -> WHILE LPAREN Exp RPAREN Stmt
+    // Children of Stmt for 'while':
+    // 0: "while" (Terminal)
+    // 1: "(" (Terminal)
+    // 2: Exp (NonTerminal) - Condition
+    // 3: ")" (Terminal)
+    // 4: Stmt (NonTerminal) - Body
+    if (!node || node->name != "Stmt" || node->children.size() < 5) {
+        std::cerr << "[IR_GEN_ERR] visitWhileStmt: Invalid WhileStmt structure or insufficient children. Name: " << (node ? node->name : "null") << ", Child count: " << (node ? node->children.size() : 0) << std::endl;
+        return;
+    }
+
+    auto condition_label = createLabel(".L_while_cond_");
+    auto body_label = createLabel(".L_while_body_");
+    auto end_label = createLabel(".L_while_end_");
+
+    loopLabelStack.push_back({condition_label, end_label});
+    std::cerr << "[IR_GEN] visitWhileStmt: Pushed labels to stack. Cond: " << condition_label->labelName << ", End: " << end_label->labelName << std::endl;
+
+    addInstruction(std::make_shared<IR::LabelInst>(condition_label->labelName));
+    std::cerr << "[IR_GEN] visitWhileStmt: Added condition_label: " << condition_label->labelName << std::endl;
+
+    auto cond_exp_node = node->children.at(2);
+    if (!cond_exp_node) {
+        std::cerr << "[IR_GEN_ERR] visitWhileStmt: Condition Exp node is null." << std::endl;
+        loopLabelStack.pop_back();
+        return;
+    }
+    std::cerr << "[IR_GEN] visitWhileStmt: Visiting condition Exp node." << std::endl;
+    std::shared_ptr<IR::IROperand> cond_operand = this->dispatchVisitExp(cond_exp_node);
+    if (!cond_operand) {
+        std::cerr << "[IR_GEN_ERR] visitWhileStmt: Failed to generate IR for condition." << std::endl;
+        loopLabelStack.pop_back();
+        return;
+    }
+
+    // CondJumpInst(condition, true_target, false_target)
+    // If condition is true (non-zero), jump to body_label. If false (zero), jump to end_label.
+    addInstruction(std::make_shared<IR::CondJumpInst>(cond_operand, body_label, end_label));
+    std::cerr << "[IR_GEN] visitWhileStmt: Added CondJumpInst. True: " << body_label->labelName << ", False: " << end_label->labelName << std::endl;
+
+    addInstruction(std::make_shared<IR::LabelInst>(body_label->labelName));
+    std::cerr << "[IR_GEN] visitWhileStmt: Added body_label: " << body_label->labelName << std::endl;
+
+    auto body_stmt_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(4));
+    if (!body_stmt_node || body_stmt_node->name != "Stmt") {
+        std::cerr << "[IR_GEN_ERR] visitWhileStmt: Body Stmt node is invalid or not a Stmt. Found: " << (body_stmt_node ? body_stmt_node->name : "null") << std::endl;
+        loopLabelStack.pop_back();
+        return;
+    }
+    std::cerr << "[IR_GEN] visitWhileStmt: Visiting body_stmt_node." << std::endl;
+    symbolTable.enterScope(); // New scope for while body (if it's a block, visitBlock will handle its own scope too)
+    this->visitStmt(body_stmt_node);
+    symbolTable.leaveScope();
+
+    addInstruction(std::make_shared<IR::JumpInst>(condition_label));
+    std::cerr << "[IR_GEN] visitWhileStmt: Added JumpInst to condition_label: " << condition_label->labelName << std::endl;
+
+    addInstruction(std::make_shared<IR::LabelInst>(end_label->labelName));
+    std::cerr << "[IR_GEN] visitWhileStmt: Added end_label: " << end_label->labelName << std::endl;
+
+    loopLabelStack.pop_back();
+    std::cerr << "[IR_GEN] visitWhileStmt: Popped labels from stack. Completed." << std::endl;
+}
+
+void IRGenerator::visitBreakStmt(PNNode node) {
+    std::cerr << "[IR_GEN] visitBreakStmt() called." << std::endl;
+    if (loopLabelStack.empty()) {
+        std::cerr << "[IR_GEN_ERR] visitBreakStmt: Break statement found outside of a loop." << std::endl;
+        // Error: break outside loop. Depending on language spec, either report error or ignore.
+        // For now, just logging error. Proper error handling might throw or set an error flag.
+        return;
+    }
+    auto break_target_label = loopLabelStack.back().second;
+    addInstruction(std::make_shared<IR::JumpInst>(break_target_label));
+    std::cerr << "[IR_GEN] visitBreakStmt: Added JumpInst to break_target_label: " << break_target_label->labelName << std::endl;
+}
+
+void IRGenerator::visitContinueStmt(PNNode node) {
+    std::cerr << "[IR_GEN] visitContinueStmt() called." << std::endl;
+    if (loopLabelStack.empty()) {
+        std::cerr << "[IR_GEN_ERR] visitContinueStmt: Continue statement found outside of a loop." << std::endl;
+        // Error: continue outside loop. Similar to break, log error for now.
+        return;
+    }
+    auto continue_target_label = loopLabelStack.back().first;
+    addInstruction(std::make_shared<IR::JumpInst>(continue_target_label));
+    std::cerr << "[IR_GEN] visitContinueStmt: Added JumpInst to continue_target_label: " << continue_target_label->labelName << std::endl;
 }
 
 }  // namespace IRGenerator

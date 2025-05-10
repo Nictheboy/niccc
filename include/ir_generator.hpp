@@ -28,6 +28,7 @@ class IRGenerator {
 
     int tempVarCounter;
     int labelCounter;
+    std::vector<std::pair<std::shared_ptr<IR::IRLabelOperand>, std::shared_ptr<IR::IRLabelOperand>>> loopLabelStack; // {continue_target, break_target}
 
     // --- 工具方法 ---
     std::shared_ptr<IR::IRVariable> createTempSimpleVar(IR::SimpleTypeKind kind = IR::SimpleTypeKind::INTEGER, const std::string& prefix = "%t");
@@ -69,6 +70,9 @@ class IRGenerator {
     void visitStmt(PNNode node);
     void visitIfStmt(PNNode node);
     void visitReturnStmt(PNNode node /* PNode expNode nullable, but ReturnStmt AST node is passed */);
+    void visitWhileStmt(PNNode node);
+    void visitBreakStmt(PNNode node);
+    void visitContinueStmt(PNNode node);
 
     // 表达式 (返回 std::shared_ptr<IR::IROperand>，通常是一个 IR::IRVariable)
     std::shared_ptr<IR::IROperand> visitExp(PNNode node);

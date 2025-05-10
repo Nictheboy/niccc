@@ -102,307 +102,694 @@ getint:
 	addi $sp, $sp, 8
 	jr $ra
 	nop
-	# Parameter 'i' assigned stack offset: -4($fp)
-	# Local var '%tmp_addsub_2' assigned stack offset: -8($fp)
-	# Local var '%tmp_addsub_4' assigned stack offset: -12($fp)
-	# Local var '%tmp_addsub_6' assigned stack offset: -16($fp)
-	# Local var '%tmp_call_fib_3' assigned stack offset: -20($fp)
-	# Local var '%tmp_call_fib_5' assigned stack offset: -24($fp)
-	# Local var '%tmp_eq_0' assigned stack offset: -28($fp)
-	# Local var '%tmp_eq_1' assigned stack offset: -32($fp)
-	# Local var 'ret' assigned stack offset: -36($fp)
-	# Function fib: totalLocalVarSize = -36, frameSize = 44
-fib:
-	# Prologue for fib
-	addiu $sp, $sp, -44
-	sw $ra, 40($sp)
-	sw $fp, 36($sp)
-	addiu $fp, $sp, 36
-	sw $a0, -4($fp)
-	# Stored $a0 (param 'i') to -4($fp)
-	# CallPureInst: CALL_PURE __builtin_eq_int(i:INTEGER, 1) -> (%tmp_eq_0:INTEGER)
+	# Local var '%tmp_addsub_10' assigned stack offset: -4($fp)
+	# Local var '%tmp_addsub_17' assigned stack offset: -8($fp)
+	# Local var '%tmp_addsub_18' assigned stack offset: -12($fp)
+	# Local var '%tmp_addsub_19' assigned stack offset: -16($fp)
+	# Local var '%tmp_addsub_20' assigned stack offset: -20($fp)
+	# Local var '%tmp_addsub_4' assigned stack offset: -24($fp)
+	# Local var '%tmp_addsub_5' assigned stack offset: -28($fp)
+	# Local var '%tmp_addsub_6' assigned stack offset: -32($fp)
+	# Local var '%tmp_addsub_9' assigned stack offset: -36($fp)
+	# Local var '%tmp_call_getint_0' assigned stack offset: -40($fp)
+	# Local var '%tmp_eq_3' assigned stack offset: -44($fp)
+	# Local var '%tmp_eq_8' assigned stack offset: -48($fp)
+	# Local var '%tmp_muldiv_1' assigned stack offset: -52($fp)
+	# Local var '%tmp_muldiv_11' assigned stack offset: -56($fp)
+	# Local var '%tmp_muldiv_12' assigned stack offset: -60($fp)
+	# Local var '%tmp_muldiv_15' assigned stack offset: -64($fp)
+	# Local var '%tmp_muldiv_7' assigned stack offset: -68($fp)
+	# Local var '%tmp_rel_13' assigned stack offset: -72($fp)
+	# Local var '%tmp_rel_14' assigned stack offset: -76($fp)
+	# Local var '%tmp_rel_16' assigned stack offset: -80($fp)
+	# Local var '%tmp_rel_2' assigned stack offset: -84($fp)
+	# Local var 'i' assigned stack offset: -88($fp)
+	# Local var 'j' assigned stack offset: -92($fp)
+	# Local var 'k' assigned stack offset: -96($fp)
+	# Local var 'max' assigned stack offset: -100($fp)
+	# Local var 'result' assigned stack offset: -104($fp)
+	# Local var 'tmp' assigned stack offset: -108($fp)
+	# Function main: totalLocalVarSize = -108, frameSize = 116
+main:
+	# Prologue for main
+	addiu $sp, $sp, -116
+	sw $ra, 112($sp)
+	sw $fp, 108($sp)
+	addiu $fp, $sp, 108
+	# --- Calling function: getint ---
+	jal getint
+	nop
+	sw $v0, -40($fp)
+	# Variable %tmp_call_getint_0 (result of getint) stored from $v0
+	# --- End of call to getint ---
+	# AssignInst: k = %tmp_call_getint_0:INTEGER
+	# Ensuring operand %tmp_call_getint_0:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -40($fp)
+	# Loaded local var %tmp_call_getint_0 from -40($fp) into $t0
+	sw $t0, -96($fp)
+	# Stored to local k at -96($fp)
+	# Released temporary register $t0
+	# CallPureInst: CALL_PURE __builtin_mul_int(k:INTEGER, k:INTEGER) -> (%tmp_muldiv_1:INTEGER)
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -96($fp)
+	# Loaded local var k from -96($fp) into $t0
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var k from -96($fp) into $t1
+	# Reserved temporary register $t2
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -52($fp)
+	# Stored result of pure call to local %tmp_muldiv_1 at -52($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: i = %tmp_muldiv_1:INTEGER
+	# Ensuring operand %tmp_muldiv_1:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -52($fp)
+	# Loaded local var %tmp_muldiv_1 from -52($fp) into $t0
+	sw $t0, -88($fp)
+	# Stored to local i at -88($fp)
+	# Released temporary register $t0
+	# AssignInst: result = 0
+	# Ensuring operand 0 is in a register
+	# Reserved temporary register $t0
+	li $t0, 0
+	sw $t0, -104($fp)
+	# Stored to local result at -104($fp)
+	# Released temporary register $t0
+.L_while_cond_0:
+	# CondJumpInst: if (1) goto .L_while_body_1 else goto .L_while_end_2
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t0
+	li $t0, 1
+	bnez $t0, .L_while_body_1
+	nop
+	j .L_while_end_2
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_while_body_1:
+	# CallPureInst: CALL_PURE __builtin_lt_int(i:INTEGER, 0) -> (%tmp_rel_2:INTEGER)
 	# Ensuring operand i:INTEGER is in a register
 	# Reserved temporary register $t0
-	lw $t0, -4($fp)
-	# Loaded local var i from -4($fp) into $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
+	# Ensuring operand 0 is in a register
+	# Reserved temporary register $t1
+	li $t1, 0
+	# Reserved temporary register $t2
+	slt $t2, $t0, $t1
+	sw $t2, -84($fp)
+	# Stored result of pure call to local %tmp_rel_2 at -84($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CondJumpInst: if (%tmp_rel_2:INTEGER) goto .L_if_then_3 else goto .L_if_endif_5
+	# Ensuring operand %tmp_rel_2:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -84($fp)
+	# Loaded local var %tmp_rel_2 from -84($fp) into $t0
+	bnez $t0, .L_if_then_3
+	nop
+	j .L_if_endif_5
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_if_then_3:
+	j .L_while_end_2
+.L_if_endif_5:
+	# CallPureInst: CALL_PURE __builtin_eq_int(i:INTEGER, k:INTEGER) -> (%tmp_eq_3:INTEGER)
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var k from -96($fp) into $t1
+	# Reserved temporary register $t2
+	xor $t2, $t0, $t1
+	sltiu $t2, $t2, 1
+	sw $t2, -44($fp)
+	# Stored result of pure call to local %tmp_eq_3 at -44($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CondJumpInst: if (%tmp_eq_3:INTEGER) goto .L_if_then_6 else goto .L_if_endif_8
+	# Ensuring operand %tmp_eq_3:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -44($fp)
+	# Loaded local var %tmp_eq_3 from -44($fp) into $t0
+	bnez $t0, .L_if_then_6
+	nop
+	j .L_if_endif_8
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_if_then_6:
+	# CallPureInst: CALL_PURE __builtin_sub_int(i:INTEGER, 1) -> (%tmp_addsub_4:INTEGER)
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
 	# Ensuring operand 1 is in a register
 	# Reserved temporary register $t1
 	li $t1, 1
 	# Reserved temporary register $t2
-	xor $t2, $t0, $t1
-	sltiu $t2, $t2, 1
-	sw $t2, -28($fp)
-	# Stored result of pure call to local %tmp_eq_0 at -28($fp)
+	subu $t2, $t0, $t1
+	sw $t2, -24($fp)
+	# Stored result of pure call to local %tmp_addsub_4 at -24($fp)
 	# Released temporary register $t0
 	# Released temporary register $t1
 	# Released temporary register $t2
-	# CondJumpInst: if (%tmp_eq_0:INTEGER) goto .L_if_then_0 else goto .L_if_endif_2
-	# Ensuring operand %tmp_eq_0:INTEGER is in a register
+	# AssignInst: i = %tmp_addsub_4:INTEGER
+	# Ensuring operand %tmp_addsub_4:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -24($fp)
+	# Loaded local var %tmp_addsub_4 from -24($fp) into $t0
+	sw $t0, -88($fp)
+	# Stored to local i at -88($fp)
+	# Released temporary register $t0
+	j .L_while_cond_0
+.L_if_endif_8:
+	# CallPureInst: CALL_PURE __builtin_add_int(result:INTEGER, i:INTEGER) -> (%tmp_addsub_5:INTEGER)
+	# Ensuring operand result:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -104($fp)
+	# Loaded local var result from -104($fp) into $t0
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -88($fp)
+	# Loaded local var i from -88($fp) into $t1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -28($fp)
+	# Stored result of pure call to local %tmp_addsub_5 at -28($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: result = %tmp_addsub_5:INTEGER
+	# Ensuring operand %tmp_addsub_5:INTEGER is in a register
 	# Reserved temporary register $t0
 	lw $t0, -28($fp)
-	# Loaded local var %tmp_eq_0 from -28($fp) into $t0
-	bnez $t0, .L_if_then_0
-	nop
-	j .L_if_endif_2
-	nop
+	# Loaded local var %tmp_addsub_5 from -28($fp) into $t0
+	sw $t0, -104($fp)
+	# Stored to local result at -104($fp)
 	# Released temporary register $t0
-	# --- End of CondJumpInst ---
-.L_if_then_0:
+	# CallPureInst: CALL_PURE __builtin_sub_int(i:INTEGER, 1) -> (%tmp_addsub_6:INTEGER)
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t1
+	li $t1, 1
+	# Reserved temporary register $t2
+	subu $t2, $t0, $t1
+	sw $t2, -32($fp)
+	# Stored result of pure call to local %tmp_addsub_6 at -32($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: i = %tmp_addsub_6:INTEGER
+	# Ensuring operand %tmp_addsub_6:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -32($fp)
+	# Loaded local var %tmp_addsub_6 from -32($fp) into $t0
+	sw $t0, -88($fp)
+	# Stored to local i at -88($fp)
+	# Released temporary register $t0
+	j .L_while_cond_0
+.L_while_end_2:
 	# --- Calling function: printf ---
 	# Ensuring operand label _S0 is in a register
 	# Reserved temporary register $t0
 	la $t0, _S0
 	# Loaded address of label _S0 into $t0
 	move $a0, $t0
-	# Ensuring operand i:INTEGER is in a register
+	# Ensuring operand result:INTEGER is in a register
 	# Reserved temporary register $t1
-	lw $t1, -4($fp)
-	# Loaded local var i from -4($fp) into $t1
+	lw $t1, -104($fp)
+	# Loaded local var result from -104($fp) into $t1
 	move $a1, $t1
-	# Ensuring operand 1 is in a register
-	# Reserved temporary register $t2
-	li $t2, 1
-	move $a2, $t2
 	jal printf
 	nop
 	# Released temporary register $t0
 	# Released temporary register $t1
-	# Released temporary register $t2
 	# --- End of call to printf ---
+	# CallPureInst: CALL_PURE __builtin_mul_int(k:INTEGER, k:INTEGER) -> (%tmp_muldiv_7:INTEGER)
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -96($fp)
+	# Loaded local var k from -96($fp) into $t0
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var k from -96($fp) into $t1
+	# Reserved temporary register $t2
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -68($fp)
+	# Stored result of pure call to local %tmp_muldiv_7 at -68($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: i = %tmp_muldiv_7:INTEGER
+	# Ensuring operand %tmp_muldiv_7:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -68($fp)
+	# Loaded local var %tmp_muldiv_7 from -68($fp) into $t0
+	sw $t0, -88($fp)
+	# Stored to local i at -88($fp)
+	# Released temporary register $t0
+	# AssignInst: result = 0
+	# Ensuring operand 0 is in a register
+	# Reserved temporary register $t0
+	li $t0, 0
+	sw $t0, -104($fp)
+	# Stored to local result at -104($fp)
+	# Released temporary register $t0
+.L_while_cond_9:
+	# CondJumpInst: if (1) goto .L_while_body_10 else goto .L_while_end_11
 	# Ensuring operand 1 is in a register
 	# Reserved temporary register $t0
 	li $t0, 1
-	move $v0, $t0
-	j fib_epilogue
+	bnez $t0, .L_while_body_10
 	nop
-.L_if_endif_2:
-	# CallPureInst: CALL_PURE __builtin_eq_int(i:INTEGER, 2) -> (%tmp_eq_1:INTEGER)
-	# Ensuring operand i:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -4($fp)
-	# Loaded local var i from -4($fp) into $t1
-	# Ensuring operand 2 is in a register
-	# Reserved temporary register $t2
-	li $t2, 2
-	# Reserved temporary register $t3
-	xor $t3, $t1, $t2
-	sltiu $t3, $t3, 1
-	sw $t3, -32($fp)
-	# Stored result of pure call to local %tmp_eq_1 at -32($fp)
-	# Released temporary register $t1
-	# Released temporary register $t2
-	# Released temporary register $t3
-	# CondJumpInst: if (%tmp_eq_1:INTEGER) goto .L_if_then_3 else goto .L_if_endif_5
-	# Ensuring operand %tmp_eq_1:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -32($fp)
-	# Loaded local var %tmp_eq_1 from -32($fp) into $t1
-	bnez $t1, .L_if_then_3
+	j .L_while_end_11
 	nop
-	j .L_if_endif_5
-	nop
-	# Released temporary register $t1
+	# Released temporary register $t0
 	# --- End of CondJumpInst ---
-.L_if_then_3:
-	# --- Calling function: printf ---
-	# Ensuring operand label _S0 is in a register
-	# Reserved temporary register $t1
-	la $t1, _S0
-	# Loaded address of label _S0 into $t1
-	move $a0, $t1
+.L_while_body_10:
+	# CallPureInst: CALL_PURE __builtin_eq_int(i:INTEGER, k:INTEGER) -> (%tmp_eq_8:INTEGER)
 	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var k from -96($fp) into $t1
 	# Reserved temporary register $t2
-	lw $t2, -4($fp)
-	# Loaded local var i from -4($fp) into $t2
-	move $a1, $t2
-	# Ensuring operand 1 is in a register
-	# Reserved temporary register $t3
-	li $t3, 1
-	move $a2, $t3
-	jal printf
-	nop
+	xor $t2, $t0, $t1
+	sltiu $t2, $t2, 1
+	sw $t2, -48($fp)
+	# Stored result of pure call to local %tmp_eq_8 at -48($fp)
+	# Released temporary register $t0
 	# Released temporary register $t1
 	# Released temporary register $t2
-	# Released temporary register $t3
-	# --- End of call to printf ---
+	# CondJumpInst: if (%tmp_eq_8:INTEGER) goto .L_if_then_12 else goto .L_if_endif_14
+	# Ensuring operand %tmp_eq_8:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -48($fp)
+	# Loaded local var %tmp_eq_8 from -48($fp) into $t0
+	bnez $t0, .L_if_then_12
+	nop
+	j .L_if_endif_14
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_if_then_12:
+	j .L_while_end_11
+.L_if_endif_14:
+	# CallPureInst: CALL_PURE __builtin_add_int(result:INTEGER, i:INTEGER) -> (%tmp_addsub_9:INTEGER)
+	# Ensuring operand result:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -104($fp)
+	# Loaded local var result from -104($fp) into $t0
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -88($fp)
+	# Loaded local var i from -88($fp) into $t1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -36($fp)
+	# Stored result of pure call to local %tmp_addsub_9 at -36($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: result = %tmp_addsub_9:INTEGER
+	# Ensuring operand %tmp_addsub_9:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -36($fp)
+	# Loaded local var %tmp_addsub_9 from -36($fp) into $t0
+	sw $t0, -104($fp)
+	# Stored to local result at -104($fp)
+	# Released temporary register $t0
+	# CallPureInst: CALL_PURE __builtin_sub_int(i:INTEGER, 1) -> (%tmp_addsub_10:INTEGER)
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
 	# Ensuring operand 1 is in a register
 	# Reserved temporary register $t1
 	li $t1, 1
-	move $v0, $t1
-	j fib_epilogue
-	nop
-.L_if_endif_5:
-	# CallPureInst: CALL_PURE __builtin_sub_int(i:INTEGER, 1) -> (%tmp_addsub_2:INTEGER)
-	# Ensuring operand i:INTEGER is in a register
 	# Reserved temporary register $t2
-	lw $t2, -4($fp)
-	# Loaded local var i from -4($fp) into $t2
-	# Ensuring operand 1 is in a register
-	# Reserved temporary register $t3
-	li $t3, 1
-	# Reserved temporary register $t4
-	subu $t4, $t2, $t3
-	sw $t4, -8($fp)
-	# Stored result of pure call to local %tmp_addsub_2 at -8($fp)
+	subu $t2, $t0, $t1
+	sw $t2, -4($fp)
+	# Stored result of pure call to local %tmp_addsub_10 at -4($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
 	# Released temporary register $t2
-	# Released temporary register $t3
-	# Released temporary register $t4
-	# --- Calling function: fib ---
-	# Ensuring operand %tmp_addsub_2:INTEGER is in a register
-	# Reserved temporary register $t2
-	lw $t2, -8($fp)
-	# Loaded local var %tmp_addsub_2 from -8($fp) into $t2
-	move $a0, $t2
-	jal fib
-	nop
-	# Released temporary register $t2
-	sw $v0, -20($fp)
-	# Variable %tmp_call_fib_3 (result of fib) stored from $v0
-	# --- End of call to fib ---
-	# CallPureInst: CALL_PURE __builtin_sub_int(i:INTEGER, 2) -> (%tmp_addsub_4:INTEGER)
-	# Ensuring operand i:INTEGER is in a register
-	# Reserved temporary register $t2
-	lw $t2, -4($fp)
-	# Loaded local var i from -4($fp) into $t2
-	# Ensuring operand 2 is in a register
-	# Reserved temporary register $t3
-	li $t3, 2
-	# Reserved temporary register $t4
-	subu $t4, $t2, $t3
-	sw $t4, -12($fp)
-	# Stored result of pure call to local %tmp_addsub_4 at -12($fp)
-	# Released temporary register $t2
-	# Released temporary register $t3
-	# Released temporary register $t4
-	# --- Calling function: fib ---
-	# Ensuring operand %tmp_addsub_4:INTEGER is in a register
-	# Reserved temporary register $t2
-	lw $t2, -12($fp)
-	# Loaded local var %tmp_addsub_4 from -12($fp) into $t2
-	move $a0, $t2
-	jal fib
-	nop
-	# Released temporary register $t2
-	sw $v0, -24($fp)
-	# Variable %tmp_call_fib_5 (result of fib) stored from $v0
-	# --- End of call to fib ---
-	# CallPureInst: CALL_PURE __builtin_add_int(%tmp_call_fib_3:INTEGER, %tmp_call_fib_5:INTEGER) -> (%tmp_addsub_6:INTEGER)
-	# Ensuring operand %tmp_call_fib_3:INTEGER is in a register
-	# Reserved temporary register $t2
-	lw $t2, -20($fp)
-	# Loaded local var %tmp_call_fib_3 from -20($fp) into $t2
-	# Ensuring operand %tmp_call_fib_5:INTEGER is in a register
-	# Reserved temporary register $t3
-	lw $t3, -24($fp)
-	# Loaded local var %tmp_call_fib_5 from -24($fp) into $t3
-	# Reserved temporary register $t4
-	addu $t4, $t2, $t3
-	sw $t4, -16($fp)
-	# Stored result of pure call to local %tmp_addsub_6 at -16($fp)
-	# Released temporary register $t2
-	# Released temporary register $t3
-	# Released temporary register $t4
-	# AssignInst: ret = %tmp_addsub_6:INTEGER
-	# Ensuring operand %tmp_addsub_6:INTEGER is in a register
-	# Reserved temporary register $t2
-	lw $t2, -16($fp)
-	# Loaded local var %tmp_addsub_6 from -16($fp) into $t2
-	sw $t2, -36($fp)
-	# Stored to local ret at -36($fp)
-	# Released temporary register $t2
+	# AssignInst: i = %tmp_addsub_10:INTEGER
+	# Ensuring operand %tmp_addsub_10:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -4($fp)
+	# Loaded local var %tmp_addsub_10 from -4($fp) into $t0
+	sw $t0, -88($fp)
+	# Stored to local i at -88($fp)
+	# Released temporary register $t0
+	j .L_while_cond_9
+.L_while_end_11:
 	# --- Calling function: printf ---
 	# Ensuring operand label _S0 is in a register
-	# Reserved temporary register $t2
-	la $t2, _S0
-	# Loaded address of label _S0 into $t2
-	move $a0, $t2
-	# Ensuring operand i:INTEGER is in a register
-	# Reserved temporary register $t3
-	lw $t3, -4($fp)
-	# Loaded local var i from -4($fp) into $t3
-	move $a1, $t3
-	# Ensuring operand ret:INTEGER is in a register
-	# Reserved temporary register $t4
-	lw $t4, -36($fp)
-	# Loaded local var ret from -36($fp) into $t4
-	move $a2, $t4
-	jal printf
-	nop
-	# Released temporary register $t2
-	# Released temporary register $t3
-	# Released temporary register $t4
-	# --- End of call to printf ---
-	# Ensuring operand ret:INTEGER is in a register
-	# Reserved temporary register $t2
-	lw $t2, -36($fp)
-	# Loaded local var ret from -36($fp) into $t2
-	move $v0, $t2
-	j fib_epilogue
-	nop
-fib_epilogue:
-	# Epilogue for fib
-	lw $ra, 4($fp)
-	lw $fp, 0($fp)
-	addiu $sp, $sp, 44
-	jr $ra
-	nop
-	# Local var '%tmp_call_fib_8' assigned stack offset: -4($fp)
-	# Local var '%tmp_call_getint_7' assigned stack offset: -8($fp)
-	# Function main: totalLocalVarSize = -8, frameSize = 16
-main:
-	# Prologue for main
-	addiu $sp, $sp, -16
-	sw $ra, 12($sp)
-	sw $fp, 8($sp)
-	addiu $fp, $sp, 8
-	# --- Calling function: printf ---
-	# Ensuring operand label _S1 is in a register
 	# Reserved temporary register $t0
-	la $t0, _S1
-	# Loaded address of label _S1 into $t0
+	la $t0, _S0
+	# Loaded address of label _S0 into $t0
 	move $a0, $t0
-	# Ensuring operand 1 is in a register
+	# Ensuring operand result:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 1
+	lw $t1, -104($fp)
+	# Loaded local var result from -104($fp) into $t1
 	move $a1, $t1
-	# Ensuring operand 2 is in a register
-	# Reserved temporary register $t2
-	li $t2, 2
-	move $a2, $t2
 	jal printf
 	nop
 	# Released temporary register $t0
 	# Released temporary register $t1
-	# Released temporary register $t2
 	# --- End of call to printf ---
-	# --- Calling function: getint ---
-	jal getint
+	# CallPureInst: CALL_PURE __builtin_mul_int(k:INTEGER, k:INTEGER) -> (%tmp_muldiv_11:INTEGER)
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -96($fp)
+	# Loaded local var k from -96($fp) into $t0
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var k from -96($fp) into $t1
+	# Reserved temporary register $t2
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -56($fp)
+	# Stored result of pure call to local %tmp_muldiv_11 at -56($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_div_int(%tmp_muldiv_11:INTEGER, 2) -> (%tmp_muldiv_12:INTEGER)
+	# Ensuring operand %tmp_muldiv_11:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -56($fp)
+	# Loaded local var %tmp_muldiv_11 from -56($fp) into $t0
+	# Ensuring operand 2 is in a register
+	# Reserved temporary register $t1
+	li $t1, 2
+	# Reserved temporary register $t2
+	div $t0, $t1
+	mflo $t2
+	sw $t2, -60($fp)
+	# Stored result of pure call to local %tmp_muldiv_12 at -60($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: max = %tmp_muldiv_12:INTEGER
+	# Ensuring operand %tmp_muldiv_12:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -60($fp)
+	# Loaded local var %tmp_muldiv_12 from -60($fp) into $t0
+	sw $t0, -100($fp)
+	# Stored to local max at -100($fp)
+	# Released temporary register $t0
+	# AssignInst: result = 0
+	# Ensuring operand 0 is in a register
+	# Reserved temporary register $t0
+	li $t0, 0
+	sw $t0, -104($fp)
+	# Stored to local result at -104($fp)
+	# Released temporary register $t0
+	# AssignInst: i = 1
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t0
+	li $t0, 1
+	sw $t0, -88($fp)
+	# Stored to local i at -88($fp)
+	# Released temporary register $t0
+.L_while_cond_15:
+	# CondJumpInst: if (1) goto .L_while_body_16 else goto .L_while_end_17
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t0
+	li $t0, 1
+	bnez $t0, .L_while_body_16
 	nop
-	sw $v0, -8($fp)
-	# Variable %tmp_call_getint_7 (result of getint) stored from $v0
-	# --- End of call to getint ---
-	# --- Calling function: fib ---
-	# Ensuring operand %tmp_call_getint_7:INTEGER is in a register
+	j .L_while_end_17
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_while_body_16:
+	# CallPureInst: CALL_PURE __builtin_gt_int(i:INTEGER, k:INTEGER) -> (%tmp_rel_13:INTEGER)
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var k from -96($fp) into $t1
+	# Reserved temporary register $t2
+	slt $t2, $t1, $t0
+	sw $t2, -72($fp)
+	# Stored result of pure call to local %tmp_rel_13 at -72($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CondJumpInst: if (%tmp_rel_13:INTEGER) goto .L_if_then_18 else goto .L_if_endif_20
+	# Ensuring operand %tmp_rel_13:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -72($fp)
+	# Loaded local var %tmp_rel_13 from -72($fp) into $t0
+	bnez $t0, .L_if_then_18
+	nop
+	j .L_if_endif_20
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_if_then_18:
+	j .L_while_end_17
+.L_if_endif_20:
+	# AssignInst: j = 1
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t0
+	li $t0, 1
+	sw $t0, -92($fp)
+	# Stored to local j at -92($fp)
+	# Released temporary register $t0
+.L_while_cond_21:
+	# CondJumpInst: if (1) goto .L_while_body_22 else goto .L_while_end_23
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t0
+	li $t0, 1
+	bnez $t0, .L_while_body_22
+	nop
+	j .L_while_end_23
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_while_body_22:
+	# CallPureInst: CALL_PURE __builtin_gt_int(j:INTEGER, k:INTEGER) -> (%tmp_rel_14:INTEGER)
+	# Ensuring operand j:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -92($fp)
+	# Loaded local var j from -92($fp) into $t0
+	# Ensuring operand k:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var k from -96($fp) into $t1
+	# Reserved temporary register $t2
+	slt $t2, $t1, $t0
+	sw $t2, -76($fp)
+	# Stored result of pure call to local %tmp_rel_14 at -76($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CondJumpInst: if (%tmp_rel_14:INTEGER) goto .L_if_then_24 else goto .L_if_endif_26
+	# Ensuring operand %tmp_rel_14:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -76($fp)
+	# Loaded local var %tmp_rel_14 from -76($fp) into $t0
+	bnez $t0, .L_if_then_24
+	nop
+	j .L_if_endif_26
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_if_then_24:
+	j .L_while_end_23
+.L_if_endif_26:
+	# CallPureInst: CALL_PURE __builtin_mul_int(i:INTEGER, j:INTEGER) -> (%tmp_muldiv_15:INTEGER)
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
+	# Ensuring operand j:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -92($fp)
+	# Loaded local var j from -92($fp) into $t1
+	# Reserved temporary register $t2
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -64($fp)
+	# Stored result of pure call to local %tmp_muldiv_15 at -64($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: tmp = %tmp_muldiv_15:INTEGER
+	# Ensuring operand %tmp_muldiv_15:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -64($fp)
+	# Loaded local var %tmp_muldiv_15 from -64($fp) into $t0
+	sw $t0, -108($fp)
+	# Stored to local tmp at -108($fp)
+	# Released temporary register $t0
+	# CallPureInst: CALL_PURE __builtin_gt_int(tmp:INTEGER, max:INTEGER) -> (%tmp_rel_16:INTEGER)
+	# Ensuring operand tmp:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -108($fp)
+	# Loaded local var tmp from -108($fp) into $t0
+	# Ensuring operand max:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -100($fp)
+	# Loaded local var max from -100($fp) into $t1
+	# Reserved temporary register $t2
+	slt $t2, $t1, $t0
+	sw $t2, -80($fp)
+	# Stored result of pure call to local %tmp_rel_16 at -80($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CondJumpInst: if (%tmp_rel_16:INTEGER) goto .L_if_then_27 else goto .L_if_endif_29
+	# Ensuring operand %tmp_rel_16:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -80($fp)
+	# Loaded local var %tmp_rel_16 from -80($fp) into $t0
+	bnez $t0, .L_if_then_27
+	nop
+	j .L_if_endif_29
+	nop
+	# Released temporary register $t0
+	# --- End of CondJumpInst ---
+.L_if_then_27:
+	# CallPureInst: CALL_PURE __builtin_add_int(j:INTEGER, 1) -> (%tmp_addsub_17:INTEGER)
+	# Ensuring operand j:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -92($fp)
+	# Loaded local var j from -92($fp) into $t0
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t1
+	li $t1, 1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -8($fp)
+	# Stored result of pure call to local %tmp_addsub_17 at -8($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: j = %tmp_addsub_17:INTEGER
+	# Ensuring operand %tmp_addsub_17:INTEGER is in a register
 	# Reserved temporary register $t0
 	lw $t0, -8($fp)
-	# Loaded local var %tmp_call_getint_7 from -8($fp) into $t0
-	move $a0, $t0
-	jal fib
-	nop
+	# Loaded local var %tmp_addsub_17 from -8($fp) into $t0
+	sw $t0, -92($fp)
+	# Stored to local j at -92($fp)
 	# Released temporary register $t0
-	sw $v0, -4($fp)
-	# Variable %tmp_call_fib_8 (result of fib) stored from $v0
-	# --- End of call to fib ---
-	# --- Calling function: printf ---
-	# Ensuring operand label _S2 is in a register
+	j .L_while_cond_21
+.L_if_endif_29:
+	# CallPureInst: CALL_PURE __builtin_add_int(result:INTEGER, tmp:INTEGER) -> (%tmp_addsub_18:INTEGER)
+	# Ensuring operand result:INTEGER is in a register
 	# Reserved temporary register $t0
-	la $t0, _S2
-	# Loaded address of label _S2 into $t0
-	move $a0, $t0
-	# Ensuring operand %tmp_call_fib_8:INTEGER is in a register
+	lw $t0, -104($fp)
+	# Loaded local var result from -104($fp) into $t0
+	# Ensuring operand tmp:INTEGER is in a register
 	# Reserved temporary register $t1
-	lw $t1, -4($fp)
-	# Loaded local var %tmp_call_fib_8 from -4($fp) into $t1
+	lw $t1, -108($fp)
+	# Loaded local var tmp from -108($fp) into $t1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -12($fp)
+	# Stored result of pure call to local %tmp_addsub_18 at -12($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: result = %tmp_addsub_18:INTEGER
+	# Ensuring operand %tmp_addsub_18:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -12($fp)
+	# Loaded local var %tmp_addsub_18 from -12($fp) into $t0
+	sw $t0, -104($fp)
+	# Stored to local result at -104($fp)
+	# Released temporary register $t0
+	# CallPureInst: CALL_PURE __builtin_add_int(j:INTEGER, 1) -> (%tmp_addsub_19:INTEGER)
+	# Ensuring operand j:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -92($fp)
+	# Loaded local var j from -92($fp) into $t0
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t1
+	li $t1, 1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -16($fp)
+	# Stored result of pure call to local %tmp_addsub_19 at -16($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: j = %tmp_addsub_19:INTEGER
+	# Ensuring operand %tmp_addsub_19:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -16($fp)
+	# Loaded local var %tmp_addsub_19 from -16($fp) into $t0
+	sw $t0, -92($fp)
+	# Stored to local j at -92($fp)
+	# Released temporary register $t0
+	j .L_while_cond_21
+.L_while_end_23:
+	# CallPureInst: CALL_PURE __builtin_add_int(i:INTEGER, 1) -> (%tmp_addsub_20:INTEGER)
+	# Ensuring operand i:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var i from -88($fp) into $t0
+	# Ensuring operand 1 is in a register
+	# Reserved temporary register $t1
+	li $t1, 1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -20($fp)
+	# Stored result of pure call to local %tmp_addsub_20 at -20($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: i = %tmp_addsub_20:INTEGER
+	# Ensuring operand %tmp_addsub_20:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -20($fp)
+	# Loaded local var %tmp_addsub_20 from -20($fp) into $t0
+	sw $t0, -88($fp)
+	# Stored to local i at -88($fp)
+	# Released temporary register $t0
+	j .L_while_cond_15
+.L_while_end_17:
+	# --- Calling function: printf ---
+	# Ensuring operand label _S0 is in a register
+	# Reserved temporary register $t0
+	la $t0, _S0
+	# Loaded address of label _S0 into $t0
+	move $a0, $t0
+	# Ensuring operand result:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -104($fp)
+	# Loaded local var result from -104($fp) into $t1
 	move $a1, $t1
 	jal printf
 	nop
@@ -419,14 +806,12 @@ main_epilogue:
 	# Epilogue for main
 	lw $ra, 4($fp)
 	lw $fp, 0($fp)
-	addiu $sp, $sp, 16
+	addiu $sp, $sp, 116
 	jr $ra
 	nop
 
 .data
 _newline: .asciiz "\n"
 # String Literals
-_S0: .asciiz "fib(%d) = %d\n"
-_S1: .asciiz "%d, %d\n"
-_S2: .asciiz "%d\n"
+_S0: .asciiz "%d\n"
 
