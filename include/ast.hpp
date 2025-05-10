@@ -33,7 +33,7 @@ class TerminalNode : public Node {
     TerminalNode(std::shared_ptr<Tokenizer::Token> token)
         : token(token) {}
 
-    std::string toString(int indent = 0) const override {
+    std::string toString([[maybe_unused]] int indent = 0) const override {
         std::string result = "\"";
         result += replaceAll(token->matched, "\"", "\\\"");
         result += "\"";

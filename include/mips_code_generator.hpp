@@ -5,8 +5,27 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <variant>  // Added for std::variant in MipsFunctionContext
 #include <vector>
 #include "ir.hpp"  // 你的IR头文件
+
+namespace IR {
+class IRProgram;
+class NormalIRFunction;
+class ReturnInst;
+class CallPureInst;
+class LoadArrayInst;
+class StoreArrayInst;
+class LabelInst;
+class JumpInst;
+class CondJumpInst;
+class CallNormalInst;  // Forward declare CallNormalInst
+class IROperand;       // Forward declare IROperand
+class IRConstant;      // Forward declare IRConstant
+class IRVariable;      // Forward declare IRVariable
+class IRLabelOperand;  // Added
+class IRType;          // Forward declare IRType
+}  // namespace IR
 
 namespace MipsCodeGenerator {
 
@@ -20,6 +39,16 @@ class MipsCodeGenerator {
     MipsCodeGenerator(std::ostream& out);  // 输出流，例如 std::cout 或文件流
 
     void generateProgram(std::shared_ptr<IR::IRProgram> irProgram);
+
+    // Instruction visitors
+    void visit(std::shared_ptr<IR::ReturnInst> inst);
+    void visit(std::shared_ptr<IR::CallPureInst> inst);
+    void visit(std::shared_ptr<IR::LoadArrayInst> inst);
+    void visit(std::shared_ptr<IR::StoreArrayInst> inst);
+    void visit(std::shared_ptr<IR::LabelInst> inst);
+    void visit(std::shared_ptr<IR::JumpInst> inst);
+    void visit(std::shared_ptr<IR::CondJumpInst> inst);
+    void visit(std::shared_ptr<IR::CallNormalInst> inst);
 
    private:
     std::ostream& output;  // 汇编代码输出流
@@ -38,18 +67,10 @@ class MipsCodeGenerator {
 
     // --- 函数处理 ---
     void generateFunction(std::shared_ptr<IR::NormalIRFunction> normalFunc);
-    // (PureIRFunction 是通过 NormalIRFunction 中的 CallPureInst 间接处理的)
+    void generatePrintfImplementation();
 
     // --- 指令翻译 ---
     // 每个NormalIRFunction的指令都有一个对应的visit方法
-    void visit(std::shared_ptr<IR::CallPureInst> inst);
-    void visit(std::shared_ptr<IR::LoadArrayInst> inst);
-    void visit(std::shared_ptr<IR::StoreArrayInst> inst);
-    void visit(std::shared_ptr<IR::LabelInst> inst);
-    void visit(std::shared_ptr<IR::JumpInst> inst);
-    void visit(std::shared_ptr<IR::CondJumpInst> inst);
-    void visit(std::shared_ptr<IR::CallNormalInst> inst);
-    void visit(std::shared_ptr<IR::ReturnInst> inst);
 
     // --- 内置纯函数翻译 ---
     // 这些方法被 visit(CallPureInst*) 调用
@@ -85,6 +106,8 @@ class MipsFunctionContext {
 
     int currentStackOffset;  // 当前栈顶相对于 $fp 的偏移（通常为负）
     int maxArgsPassed;       // 此函数调用其他函数时传递的最大参数数量 (用于预留栈空间)
+    int frameSize;           // <<< ADDED frameSize HERE
+    int totalLocalVarSize;   // Added to store size of local variables
 
     // 变量位置映射：IRVariable名 -> (寄存器名 或 栈偏移量)
     // std::variant<std::string (reg), int (stack_offset)>
@@ -103,6 +126,7 @@ class MipsFunctionContext {
 
     void allocateParameters();
     void allocateLocalsAndTemporaries();  // 可能在遍历指令时动态分配临时变量的栈空间
+    void analyzeFunctionLayout();         // New method for pre-calculating layout
 
     int getVarStackOffset(const std::string& varName);
     std::string getVarRegister(const std::string& varName);  // 如果在寄存器中

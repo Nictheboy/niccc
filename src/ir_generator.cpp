@@ -1,7 +1,60 @@
 #include "ir_generator.hpp"
-#include <iostream>  // Required for std::cerr
+#include <algorithm>  // Required for std::remove
+#include <iostream>   // Required for std::cerr
+#include <memory>     // Required for std::shared_ptr
+#include <string>     // Required for std::string manipulations
+#include <vector>     // Required for std::vector
 
 namespace IRGenerator {
+
+// Helper function to process raw string literals
+// Removes surrounding quotes and unescapes common sequences.
+std::string processRawStringLiteral(const std::string& raw_literal) {
+    if (raw_literal.length() < 2 || raw_literal.front() != '"' || raw_literal.back() != '"') {
+        // This shouldn't happen if the tokenizer is correct, but good to handle.
+        // Consider logging an error or throwing an exception.
+        std::cerr << "[IR_GEN_ERR] Invalid raw string literal format: " << raw_literal << std::endl;
+        return raw_literal;  // Or an empty string, or throw
+    }
+
+    std::string content = raw_literal.substr(1, raw_literal.length() - 2);
+    std::string unescaped_content;
+    unescaped_content.reserve(content.length());
+
+    for (size_t i = 0; i < content.length(); ++i) {
+        if (content[i] == '\\' && i + 1 < content.length()) {
+            switch (content[i + 1]) {
+                case 'n':
+                    unescaped_content += '\n';
+                    i++;
+                    break;
+                case 't':
+                    unescaped_content += '\t';
+                    i++;
+                    break;
+                case '\'':
+                    unescaped_content += '\'';
+                    i++;
+                    break;  // Escape for single quote
+                case '"':
+                    unescaped_content += '"';
+                    i++;
+                    break;
+                case '\\':
+                    unescaped_content += '\\';
+                    i++;
+                    break;  // Actual backslash
+                // Add other escapes as needed (e.g., \r, \0)
+                default:
+                    unescaped_content += '\\';
+                    break;  // Not a recognized escape, keep backslash
+            }
+        } else {
+            unescaped_content += content[i];
+        }
+    }
+    return unescaped_content;
+}
 
 void IRGenerator::visitFuncDef(PNNode node) {
     std::cerr << "[IR_GEN] visitFuncDef() called for node: " << (node ? node->name : "null") << " with " << (node ? node->children.size() : 0) << " children." << std::endl;
@@ -83,11 +136,13 @@ void IRGenerator::visitFuncDef(PNNode node) {
     // 9. Visit the function body (Block node - child at index 5)
     auto block_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(5));
     if (!block_node) {
-        std::cerr << "[IR_GEN] visitFuncDef: Failed to cast Block node from child @ index 5." << std::endl;
-        // Potentially allow functions with no body if grammar supports declarations vs definitions differently
-        // but for a definition, a block is usually expected.
+        std::cerr << "[IR_GEN] visitFuncDef: Failed to cast Block node for function '" << func_name << "'." << std::endl;
+        symbolTable.leaveScope();
+        this->currentNormalFunction = nullptr;
+        std::cerr << "[IR_GEN] visitFuncDef: Scope left, currentNormalFunction reset. Completed for function '" << func_name << "' (no body)." << std::endl;
+        return;
     } else {
-        std::cerr << "[IR_GEN] visitFuncDef: Visiting block node: " << block_node->name << std::endl;
+        std::cerr << "[IR_GEN] visitFuncDef: Visiting block node: " << block_node->name << " for function '" << func_name << "'." << std::endl;
         visitBlock(block_node, false);
     }
 
@@ -315,50 +370,52 @@ void IRGenerator::visitReturnStmt(PNNode node) {
 
     // AST for return statement: Stmt -> "return" Exp ";"
     // Or for void return: Stmt -> "return" ";"
-    if (node && !node->children.empty()) {
-        // Child 0 is "return" keyword.
-        // Child 1 could be Exp or ";"
-        if (node->children.size() > 1) {
-            auto second_child = node->children.at(1);
-            // Check if the second child is not the semicolon, implying it's an expression.
-            bool is_expression_present = true;
-            if (auto terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(second_child)) {
-                if (terminal_node->token && terminal_node->token->matched == ";") {
-                    is_expression_present = false;  // It's "return ;"
-                }
+    if (!node || node->name != "Stmt" || node->children.empty()) {  // Ensure node is a Stmt node
+        std::cerr << "[IR_GEN] visitReturnStmt: Node is null, not a Stmt, or has no children. Name: "
+                  << (node ? node->name : "null") << std::endl;
+        return;  // Not a valid Stmt for return processing
+    }
+
+    // Child 0 is expected to be "return" keyword.
+    auto return_keyword_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(0));
+    if (!return_keyword_node || !return_keyword_node->token || return_keyword_node->token->matched != "return") {
+        std::cerr << "[IR_GEN] visitReturnStmt: Stmt node is not a return statement. First child token: "
+                  << (return_keyword_node && return_keyword_node->token ? return_keyword_node->token->matched : "<missing>")
+                  << std::endl;
+        // This function should only be called for actual return statements.
+        // If called incorrectly, do not proceed with generating a return instruction.
+        return;
+    }
+
+    if (node->children.size() > 1) {  // Check if there's more than just the "return" keyword
+        auto second_child = node->children.at(1);
+        // Check if the second child is not the semicolon, implying it's an expression.
+        bool is_expression_present = true;
+        if (auto terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(second_child)) {
+            if (terminal_node->token && terminal_node->token->matched == ";") {
+                is_expression_present = false;  // It's "return ;"
             }
+        }
 
-            if (is_expression_present) {
-                // Ensure we are not trying to visit a semicolon as an expression
-                if (node->children.size() >= 2) {  // "return" Exp ...
-                    // The expression is the second child.
-                    PNode exp_ast_node = node->children.at(1);
-                    std::cerr << "[IR_GEN] visitReturnStmt: Visiting expression for return." << std::endl;
-                    std::cerr << "[IR_GEN] visitReturnStmt: BEFORE calling dispatchVisitExp. exp_ast_node is " << (exp_ast_node ? "valid_ptr" : "nullptr") << "." << std::endl;
-                    return_value_operand = this->dispatchVisitExp(exp_ast_node);
-                    std::cerr << "[IR_GEN] visitReturnStmt: AFTER calling dispatchVisitExp. Operand has_value(): "
-                              << return_value_operand.has_value() << "." << std::endl;
-                    if (return_value_operand.has_value()) {
-                        std::cerr << "[IR_GEN] visitReturnStmt: Operand value is " << (return_value_operand.value() ? "valid_ptr" : "nullptr") << "." << std::endl;
-                    }
-
-                    if (!return_value_operand.has_value() || !return_value_operand.value()) {
-                        std::cerr << "[IR_GEN] visitReturnStmt: Failed to generate IR for return expression (operand is nullopt or nullptr)." << std::endl;
-                    }
-                } else {
-                    std::cerr << "[IR_GEN] visitReturnStmt: Return statement with expression expected at least 2 children (return, Exp), found " << node->children.size() << std::endl;
+        if (is_expression_present) {
+            // Ensure we are not trying to visit a semicolon as an expression
+            if (node->children.size() >= 2) {  // "return" Exp ...
+                // The expression is the second child.
+                PNode exp_ast_node = node->children.at(1);
+                std::cerr << "[IR_GEN] visitReturnStmt: Visiting expression for return." << std::endl;
+                return_value_operand = this->dispatchVisitExp(exp_ast_node);
+                if (!return_value_operand.has_value() || !return_value_operand.value()) {
+                    std::cerr << "[IR_GEN] visitReturnStmt: Failed to generate IR for return expression." << std::endl;
                 }
             } else {
-                std::cerr << "[IR_GEN] visitReturnStmt: Detected void return (return ;)." << std::endl;
+                std::cerr << "[IR_GEN] visitReturnStmt: Return statement with expression expected at least 2 children (return, Exp), found " << node->children.size() << std::endl;
             }
         } else {
-            // This case (e.g. only "return" child) might be an incomplete AST or a grammar that allows "return" without ";"
-            std::cerr << "[IR_GEN] visitReturnStmt: Return statement has only one child (the 'return' keyword). Assuming void return or expecting semicolon to be handled by parser." << std::endl;
+            std::cerr << "[IR_GEN] visitReturnStmt: Detected void return (return ;)." << std::endl;
         }
     } else {
-        std::cerr << "[IR_GEN] visitReturnStmt: Return Stmt node is null or has no children. Cannot process." << std::endl;
-        // Potentially throw an error or handle as appropriate
-        // For now, will proceed and create a ReturnInst with no operand.
+        // This case (e.g. only "return" child) might be an incomplete AST or a grammar that allows "return" without ";"
+        std::cerr << "[IR_GEN] visitReturnStmt: Return statement has only one child (the 'return' keyword). Assuming void return or expecting semicolon to be handled by parser." << std::endl;
     }
 
     auto actual_return_inst = std::make_shared<IR::ReturnInst>(return_value_operand);
@@ -388,56 +445,135 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
     if (auto terminal_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_of_stmt)) {
         std::cerr << "[IR_GEN] visitStmt: First child is terminal: " << terminal_child->token->matched << std::endl;
         if (terminal_child->token->matched == "return") {
-            // Pass the Stmt node itself to visitReturnStmt, which expects it.
-            // visitReturnStmt will then look into its children for Exp.
             this->visitReturnStmt(stmtNode);
         }
         // else if (terminal_child->token->matched == "if") { ... }
         // ... other keyword-based statements
     } else if (auto non_terminal_child = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child_of_stmt)) {
-        // This could be an assignment (LVal = Exp) or an ExpStmt
-        // If Stmt -> Exp (for expression statements)
-        // if (non_terminal_child->name == "Exp") { this->visitExpStmt(stmtNode); }
-        // If Stmt -> LVal AssignOp Exp (for assignments)
-        // Need to check for assignment structure here.
-        std::cerr << "[IR_GEN] visitStmt: First child is non-terminal: " << non_terminal_child->name << ". (Might be ExpStmt or AssignStmt, unhandled for now)" << std::endl;
+        std::cerr << "[IR_GEN] visitStmt: First child is non-terminal: " << non_terminal_child->name << std::endl;
+        // This could be an assignment (LVal = Exp), an ExpStmt, or other complex statements.
+        // If it's an expression statement (e.g., a function call like printf()),
+        // we need to visit the expression. The result is often discarded.
+        // For now, let's assume if the first child is an "Exp" (or a similar top-level expression node name
+        // your parser uses for expression statements), we should visit it.
+        // You might need to adjust the check non_terminal_child->name == "Exp" based on your AST structure.
+        if (non_terminal_child->name == "Exp" ||
+            non_terminal_child->name == "LOrExp" ||
+            non_terminal_child->name == "LAndExp" ||
+            non_terminal_child->name == "EqExp" ||
+            non_terminal_child->name == "RelExp" ||
+            non_terminal_child->name == "AddExp" ||
+            non_terminal_child->name == "MulExp" ||
+            non_terminal_child->name == "UnaryExp" ||
+            non_terminal_child->name == "PrimaryExp" ||
+            non_terminal_child->name == "FunctionCall"  // If a FunctionCall can be a direct child of Stmt
+        ) {
+            std::cerr << "[IR_GEN] visitStmt: Visiting expression child " << non_terminal_child->name << " for side effects." << std::endl;
+            this->dispatchVisitExp(non_terminal_child);  // Visit the expression
+        } else {
+            std::cerr << "[IR_GEN] visitStmt: Unhandled non-terminal statement type: " << non_terminal_child->name << std::endl;
+        }
+    } else {
+        std::cerr << "[IR_GEN] visitStmt: First child of Stmt is neither Terminal nor NonTerminal. Node type ID: "
+                  << (first_child_of_stmt ? typeid(*first_child_of_stmt).name() : "null_child_pointer") << std::endl;
     }
-    // else if (node->name == "ExpStmt") { this->visitExpStmt(node); }
-    // ... other specific statement type checks based on node->name if your AST has them ...
 }
 
 // Helper to visit a list of actual parameters (arguments) in a function call
 std::vector<std::shared_ptr<IR::IROperand>> IRGenerator::visitFuncRParams(PNNode node) {
-    // Assuming FuncRParams AST Node structure, e.g.:
-    // node->name == "FuncRParams"
-    // node->children are a list of Exp nodes for each argument.
     std::vector<std::shared_ptr<IR::IROperand>> ir_args;
 
-    if (!node) {  // Can be null if no arguments are passed and grammar allows it.
+    if (!node) {
+        std::cerr << "[IR_GEN] visitFuncRParams: Called with null node (no arguments)." << std::endl;
         return ir_args;
     }
 
-    if (node->name != "FuncRParams" && node->name != "ExpList") {  // Adjust to your AST names for arg lists
-        // TODO: Error handling or specific logic if an unexpected node type is here.
-        // If it's a single expression, it might not be wrapped in a list node.
-        // For now, assume it is a list or empty.
+    // AST structure from dump for FuncRParams (e.g., for printf("format %d", 1)) seems to be:
+    // FuncRParams(
+    //   Exp(LOrExp(...PrimaryExp("\"format %d\""))),  // Child 0
+    //   FuncRParamsFollowing(                         // Child 1
+    //     TerminalNode(","),                        // Child 0 of FuncRParamsFollowing
+    //     Exp(LOrExp(...PrimaryExp(Number("1")))), // Child 1 of FuncRParamsFollowing
+    //     FuncRParamsFollowing()                     // Child 2 of FuncRParamsFollowing (empty)
+    //   )
+    // )
+    // Or for a single argument: FuncRParams(Exp(...), FuncRParamsFollowing()_empty)
+
+    std::cerr << "[IR_GEN] visitFuncRParams: Processing FuncRParams node: " << node->name
+              << " with " << node->children.size() << " direct children." << std::endl;
+
+    if (node->name != "FuncRParams") {
+        std::cerr << "[IR_GEN_ERR] visitFuncRParams: Expected FuncRParams node, got " << node->name << std::endl;
         return ir_args;
     }
 
-    for (const auto& child_exp_node : node->children) {
-        auto exp_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(child_exp_node);
-        if (exp_node) {
-            std::shared_ptr<IR::IROperand> arg_operand = this->dispatchVisitExp(exp_node);
-            if (arg_operand) {
-                ir_args.push_back(arg_operand);
-            } else {
-                // TODO: Handle error: failed to generate IR for an argument expression
-                // Consider adding a placeholder or throwing
-            }
+    if (node->children.empty()) {
+        std::cerr << "[IR_GEN] visitFuncRParams: FuncRParams node has no children (no arguments)." << std::endl;
+        return ir_args;  // No arguments
+    }
+
+    // Process the first argument (Exp)
+    auto first_arg_exp_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(0));
+    if (first_arg_exp_node) {
+        std::cerr << "[IR_GEN] visitFuncRParams: Visiting first argument Exp node: " << first_arg_exp_node->name << std::endl;
+        std::shared_ptr<IR::IROperand> arg_operand = this->dispatchVisitExp(first_arg_exp_node);
+        if (arg_operand) {
+            ir_args.push_back(arg_operand);
+            std::cerr << "[IR_GEN] visitFuncRParams: Added first argument. Total args: " << ir_args.size() << std::endl;
         } else {
-            // TODO: Handle error: argument node is not an AST::NonTerminalNode
+            std::cerr << "[IR_GEN_ERR] visitFuncRParams: Failed to generate IR for first argument expression." << std::endl;
+        }
+    } else {
+        std::cerr << "[IR_GEN_ERR] visitFuncRParams: First child of FuncRParams is not a NonTerminalNode (Exp)." << std::endl;
+        return ir_args;  // Critical error in AST structure for FuncRParams
+    }
+
+    // Process subsequent arguments from FuncRParamsFollowing
+    if (node->children.size() > 1) {
+        auto current_frpf_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(1));
+        while (current_frpf_node && current_frpf_node->name == "FuncRParamsFollowing" && !current_frpf_node->children.empty()) {
+            std::cerr << "[IR_GEN] visitFuncRParams: Processing FuncRParamsFollowing node with "
+                      << current_frpf_node->children.size() << " children." << std::endl;
+            // Expected structure of FuncRParamsFollowing: Terminal(","), Exp, FuncRParamsFollowing (recursive)
+            if (current_frpf_node->children.size() < 2) {  // Need at least COMMA and Exp
+                std::cerr << "[IR_GEN] visitFuncRParams: FuncRParamsFollowing node is empty or missing Exp. Stopping arg processing." << std::endl;
+                break;  // End of arguments or malformed
+            }
+
+            // Child 0 should be COMMA (TerminalNode), Child 1 should be Exp (NonTerminalNode)
+            auto comma_node = std::dynamic_pointer_cast<AST::TerminalNode>(current_frpf_node->children.at(0));
+            auto next_arg_exp_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(current_frpf_node->children.at(1));
+
+            if (!comma_node || !comma_node->token || comma_node->token->matched != ",") {
+                std::cerr << "[IR_GEN_ERR] visitFuncRParams: Expected COMMA in FuncRParamsFollowing, but found: "
+                          << (comma_node && comma_node->token ? comma_node->token->matched : "<not a comma or missing token>") << std::endl;
+                break;  // Malformed, stop processing arguments
+            }
+
+            if (next_arg_exp_node) {
+                std::cerr << "[IR_GEN] visitFuncRParams: Visiting next argument Exp node: " << next_arg_exp_node->name << std::endl;
+                std::shared_ptr<IR::IROperand> arg_operand = this->dispatchVisitExp(next_arg_exp_node);
+                if (arg_operand) {
+                    ir_args.push_back(arg_operand);
+                    std::cerr << "[IR_GEN] visitFuncRParams: Added subsequent argument. Total args: " << ir_args.size() << std::endl;
+                } else {
+                    std::cerr << "[IR_GEN_ERR] visitFuncRParams: Failed to generate IR for a subsequent argument expression." << std::endl;
+                }
+            } else {
+                std::cerr << "[IR_GEN_ERR] visitFuncRParams: Child 1 of FuncRParamsFollowing is not a NonTerminalNode (Exp)." << std::endl;
+                break;  // Malformed
+            }
+
+            // Move to the next FuncRParamsFollowing node, if it exists
+            if (current_frpf_node->children.size() > 2) {
+                current_frpf_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(current_frpf_node->children.at(2));
+            } else {
+                current_frpf_node = nullptr;  // No more FuncRParamsFollowing
+            }
         }
     }
+
+    std::cerr << "[IR_GEN] visitFuncRParams: Finished processing. Total arguments collected: " << ir_args.size() << std::endl;
     return ir_args;
 }
 
@@ -531,9 +667,11 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitPrimaryExp(PNNode node) {
     // 1. '(' Exp ')'  (paren_exp_node)
     // 2. LVal
     // 3. Number (TerminalNode or a NonTerminalNode wrapping a TerminalNode)
+    // 4. String Literal (TerminalNode)
 
     if (!node || node->children.empty()) {
         // TODO: Handle error: Invalid PrimaryExp node
+        std::cerr << "[IR_GEN_ERR] visitPrimaryExp: Invalid or empty PrimaryExp node: " << (node ? node->name : "<null_node>") << std::endl;
         return nullptr;
     }
 
@@ -558,19 +696,40 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitPrimaryExp(PNNode node) {
 
     // Case 3 (part 1): Number as a direct TerminalNode child of PrimaryExp
     else if (auto terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
-        // We need a way to confirm this terminal IS a number.
-        // Using its token type or relying on visitNumber to handle non-numbers gracefully.
-        // A more robust check would be: if (terminal_node->token->type == Tokenizer::TokenType::INTEGER_LITERAL) { ... }
-        // For now, a basic check on the matched string. This should ideally be based on token type.
-        if (terminal_node->token && !terminal_node->token->matched.empty() &&
-            (isdigit(terminal_node->token->matched[0]) ||
-             (terminal_node->token->matched.length() > 1 && terminal_node->token->matched[0] == '-' && isdigit(terminal_node->token->matched[1])))) {
-            return this->visitNumber(terminal_node);
+        if (terminal_node->token && !terminal_node->token->matched.empty()) {
+            const std::string& matched_text = terminal_node->token->matched;
+            if (matched_text.length() >= 2 && matched_text.front() == '"' && matched_text.back() == '"') {
+                std::cerr << "[IR_GEN] visitPrimaryExp: Found string literal: " << matched_text << std::endl;
+                std::string processed_string = processRawStringLiteral(matched_text);
+                if (!this->program) {
+                    std::cerr << "[IR_GEN_ERR] visitPrimaryExp: this->program is null! Cannot add string literal." << std::endl;
+                    return nullptr;
+                }
+                // Assuming IRProgram has a method addStringLiteral that returns a string label (e.g., _S0, _S1)
+                // This method needs to be implemented in IRProgram.cpp and declared in ir.hpp.
+                std::string string_label = this->program->addStringLiteral(processed_string);  // THIS LINE WILL CAUSE A COMPILER ERROR IF addStringLiteral is not in IRProgram
+                std::cerr << "[IR_GEN] visitPrimaryExp: String literal '" << processed_string << "' assigned label: " << string_label << std::endl;
+                return std::make_shared<IR::IRLabelOperand>(string_label);  // Assuming IRLabelOperand exists and is an IROperand
+            } else if (isdigit(matched_text[0]) ||
+                       (matched_text.length() > 1 && matched_text[0] == '-' && isdigit(matched_text[1]))) {
+                return this->visitNumber(terminal_node);
+            }
         }
     }
 
-    // Fallback or error
-    // throw std::runtime_error("Unsupported PrimaryExp structure: " + node->name + " with child " + first_child_base->toString());
+    // Fallback or error for PrimaryExp
+    std::string child_info_str = "null_child_base_pointer";
+    if (first_child_base) {
+        if (auto nt_child = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child_base)) {
+            child_info_str = "NonTerminalNode(name: " + nt_child->name + ")";
+        } else if (auto t_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
+            child_info_str = "TerminalNode(token: " + (t_child->token ? t_child->token->matched : "<no_token>") + ")";
+        } else {
+            child_info_str = "UnknownChildNodeType(typeid: " + std::string(typeid(*first_child_base).name()) + ")";
+        }
+    }
+    std::cerr << "[IR_GEN_ERR] visitPrimaryExp: Unsupported PrimaryExp structure. Node: " << (node ? node->name : "null_node")
+              << " with child: " << child_info_str << std::endl;
     return nullptr;
 }
 
@@ -579,38 +738,81 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitPrimaryExp(PNNode node) {
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitUnaryExp(PNNode node) {
     std::cerr << "[IR_GEN] visitUnaryExp() called for node: " << (node ? node->name : "<null_node>") << std::endl;
-    // Assuming UnaryExp -> PrimaryExp or UnaryExp -> UnaryOp UnaryExp
-    // For "0", it's UnaryExp -> PrimaryExp.
-    if (!node || node->children.empty()) { /* TODO: Error */
+    if (!node || node->children.empty()) {
+        std::cerr << "[IR_GEN_ERR] visitUnaryExp: Null or empty UnaryExp node." << std::endl;
         return nullptr;
     }
 
-    // TODO: Handle UnaryOp (e.g., '-', '!') here if present.
-    // Example: if child is UnaryOp and then another UnaryExp.
-    // For now, assume it directly contains a PrimaryExp or an equivalent expression node.
+    // Try to identify a function call structure first, e.g., ID ( ARG_LIST )
+    // AST seems to be: UnaryExp(ID_Terminal, LPAREN_Terminal, FuncRParams_NonTerminal, RPAREN_Terminal)
+    // Or for no-arg call: UnaryExp(ID_Terminal, LPAREN_Terminal, FuncRParams_NonTerminal_empty, RPAREN_Terminal)
+    // The FuncRParams node itself might be optional or its children list empty if grammar is like that.
 
-    // If UnaryExp -> PrimaryExp (common case for non-operator unary expressions)
-    // The child node might be named "PrimaryExp" or could be some other expression type
-    // that UnaryExp can directly produce based on your grammar.
+    if (node->children.size() >= 2) {  // Minimum for ID() assuming FuncRParams might be absent or children[1] is '('
+        auto first_child = node->children.at(0);
+        auto id_node = std::dynamic_pointer_cast<AST::TerminalNode>(first_child);
+
+        // Check for function call pattern: ID ( ... )
+        // More robustly, check token types of children for ID, LPAREN, etc.
+        // For now, assume structure based on typical parsers: ID is first child, then '('
+        if (id_node && node->children.size() >= 3) {  // Need at least ID, '(', ')' for a basic call ID()
+                                                      // If FuncRParams is child 2: ID, '(', FuncRParams, ')' -> size 4
+                                                      // If FuncRParams is child 1 (after ID): ID, FuncRParams -> size 2, FuncRParams has '(',')'
+            // Let's assume based on the AST dump: UnaryExp("printf", "(", FuncRParams(...), ")")
+            // Child 0: "printf" (TerminalNode)
+            // Child 1: "(" (TerminalNode)
+            // Child 2: FuncRParams (NonTerminalNode)
+            // Child 3: ")" (TerminalNode)
+
+            if (node->children.size() == 4) {  // Expecting ID, LPAREN, FuncRParams, RPAREN
+                auto lparen_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(1));
+                auto func_rparams_node_base = node->children.at(2);  // This could be FuncRParams or ExpList etc.
+                auto rparen_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(3));
+
+                // Basic structural check
+                if (id_node && lparen_node && lparen_node->token && lparen_node->token->matched == "(" &&
+                    rparen_node && rparen_node->token && rparen_node->token->matched == ")") {
+                    auto func_rparams_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(func_rparams_node_base);
+                    // func_rparams_node can be null if FuncRParams is optional and not present for a no-arg call,
+                    // OR if the grammar always includes a FuncRParams node which might be empty.
+                    // visitFunctionCall should handle a potentially null paramsNode.
+
+                    std::cerr << "[IR_GEN] visitUnaryExp: Detected function call for ID: " << id_node->token->matched << std::endl;
+                    return this->visitFunctionCall(id_node, func_rparams_node);
+                }
+            }
+        }
+    }
+
+    // Original logic for UnaryExp -> PrimaryExp or UnaryExp -> other single expression child
+    // This path is taken if it's not a function call structure like ID (PARAMS)
     auto child_exp_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(0));
     if (child_exp_node) {
         if (child_exp_node->name == "PrimaryExp") {
+            std::cerr << "[IR_GEN] visitUnaryExp: UnaryExp -> PrimaryExp. Visiting PrimaryExp." << std::endl;
             return this->visitPrimaryExp(child_exp_node);
-        } else if (child_exp_node->name == "FunctionCall") {  // If UnaryExp can be FuncCall ID(Args)
-            // Assuming FunctionCall node has ID as child 0 (Terminal) and Args as child 1 (NonTerminal)
-            auto func_id_node = std::dynamic_pointer_cast<AST::TerminalNode>(child_exp_node->children.at(0));
-            PNNode func_args_node = nullptr;
-            if (child_exp_node->children.size() > 1) {
-                func_args_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(child_exp_node->children.at(1));
+        } else if (child_exp_node->name == "FunctionCall") {
+            // This case might be if your AST *already* has a dedicated "FunctionCall" non-terminal under UnaryExp
+            // The AST dump showed UnaryExp directly containing terminals for ID, '(', etc. not a FunctionCall node.
+            // If it *can* be a FunctionCall node, its structure would be: FunctionCall(ID, FuncRParams)
+            std::cerr << "[IR_GEN] visitUnaryExp: UnaryExp -> FunctionCall node. Visiting FunctionCall node." << std::endl;
+            if (child_exp_node->children.size() >= 1) {  // At least ID
+                auto func_id_node = std::dynamic_pointer_cast<AST::TerminalNode>(child_exp_node->children.at(0));
+                PNNode func_args_node = nullptr;
+                if (child_exp_node->children.size() > 1) {  // Optional args node
+                    func_args_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(child_exp_node->children.at(1));
+                }
+                return this->visitFunctionCall(func_id_node, func_args_node);
             }
-            return this->visitFunctionCall(func_id_node, func_args_node);
         }
-        // Add other direct productions of UnaryExp if necessary, e.g. if it can directly be a FunctionCall node.
-        // Fallback: if the child is some other Exp type, dispatch generically.
-        // This requires child_exp_node to be a valid AST structure for dispatchVisitExp.
-        // return this->dispatchVisitExp(child_exp_node);
+        // Fallback for other non-terminal children of UnaryExp if not PrimaryExp or FunctionCall node
+        // This is a bit of a catch-all; ideally, UnaryExp productions are more specific.
+        std::cerr << "[IR_GEN] visitUnaryExp: UnaryExp -> NonTerminal(" << child_exp_node->name << "). Attempting generic dispatch." << std::endl;
+        return this->dispatchVisitExp(child_exp_node);  // Generic dispatch for other expression types under UnaryExp
     }
-    // TODO: Error if child is not as expected.
+
+    std::cerr << "[IR_GEN_ERR] visitUnaryExp: Unhandled UnaryExp structure. First child is not a recognized NonTerminal for expression, nor does it match function call pattern. Child type: "
+              << (node->children.at(0) ? typeid(*node->children.at(0)).name() : "null_child_pointer") << std::endl;
     return nullptr;
 }
 
@@ -779,7 +981,7 @@ std::shared_ptr<IR::IRLabelOperand> IRGenerator::createLabel(const std::string& 
 
 // Constructor might need to initialize counters
 IRGenerator::IRGenerator()
-    : tempVarCounter(0), labelCounter(0) {
+    : program(nullptr), currentNormalFunction(nullptr), tempVarCounter(0), labelCounter(0) {  // Initialize program and currentNormalFunction to nullptr
     // program = std::make_shared<IR::IRProgram>(); // Usually done in generate()
     // defineBuiltinPureFunctions(); // If you have this method for pre-populating pure functions
 }
@@ -798,7 +1000,11 @@ std::shared_ptr<IR::IRProgram> IRGenerator::generate(PNode rootAstNode) {
 void IRGenerator::dispatchVisit(PNode node_base) {
     auto node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node_base);
     if (!node) {
-        std::cerr << "[IR_GEN] dispatchVisit() called with null or TerminalNode" << std::endl;
+        if (node_base) {
+            std::cerr << "[IR_GEN] dispatchVisit() called with TerminalNode or unknown node type. TypeID: " << typeid(*node_base).name() << std::endl;
+        } else {
+            std::cerr << "[IR_GEN] dispatchVisit() called with null" << std::endl;
+        }
         return;
     }
     std::cerr << "[IR_GEN] dispatchVisit() trying to dispatch node: " << node->name << std::endl;

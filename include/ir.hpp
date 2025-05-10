@@ -49,7 +49,12 @@ class SimpleIRType : public IRType {
                 return "UNKNOWN_SIMPLE_TYPE";
         }
     }
-    bool equals(const IRType* other) const override { /* ... */ return false; }
+    bool equals(const IRType* other) const override {
+        if (auto otherSimple = dynamic_cast<const SimpleIRType*>(other)) {
+            return kind == otherSimple->kind;
+        }
+        return false;
+    }
 };
 
 class ArrayIRType : public IRType {
@@ -523,6 +528,26 @@ class IRProgram {
     std::map<std::string, std::shared_ptr<NormalIRFunction>> normalFunctions;
     // Could also have global variable declarations here
 
+    // For string literals
+    std::map<std::string, std::string> stringLiterals;  // label -> processed_string
+    int stringLiteralCounter = 0;
+
+    std::string addStringLiteral(const std::string& content) {
+        // Check if identical string already exists to reuse label
+        for (const auto& pair : stringLiterals) {
+            if (pair.second == content) {
+                return pair.first;
+            }
+        }
+        std::string label = "_S" + std::to_string(stringLiteralCounter++);
+        stringLiterals[label] = content;
+        return label;
+    }
+
+    const std::map<std::string, std::string>& getStringLiteralTable() const {
+        return stringLiterals;
+    }
+
     void addPureFunction(std::shared_ptr<PureIRFunction> func) {
         pureFunctions[func->name] = func;
     }
@@ -540,6 +565,10 @@ class IRProgram {
         s += "\n--- NORMAL FUNCTIONS ---\n";
         for (const auto& pair : normalFunctions) {
             s += pair.second->toString() + "\n";
+        }
+        s += "\n--- STRING LITERALS ---\n";
+        for (const auto& pair : stringLiterals) {
+            s += pair.first + ": \"" + pair.second + "\"\n";  // Basic escaping for output
         }
         return s;
     }
