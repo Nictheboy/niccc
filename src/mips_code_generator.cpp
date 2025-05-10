@@ -209,6 +209,8 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::ReturnInst> inst) {
         // Void return, $v0 can be anything.
     }
     // Actual jr $ra and stack cleanup is in epilogue.
+    this->emit("j " + currentFunctionContext->epilogueLabel);
+    this->emit("nop");
 }
 
 void MipsCodeGenerator::visit(std::shared_ptr<IR::CallPureInst> inst) {
@@ -286,11 +288,35 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::CallPureInst> inst) {
         }
     } else if (inst->pureFunctionName == "__builtin_eq_int") { 
         if (result_val_reg.empty()) { emit("# ERROR: __builtin_eq_int needs a destination register."); } else {
-            std::string temp_xor_flag = currentFunctionContext->reserveRegister(); 
-            emit("xor " + temp_xor_flag + ", " + op1_reg + ", " + op2_reg); 
-            emit("sltu " + result_val_reg + ", $zero, " + temp_xor_flag);   
-            emit("xori " + result_val_reg + ", " + result_val_reg + ", 1"); 
-            currentFunctionContext->releaseRegister(temp_xor_flag);
+            // (op1 == op2) -> set $dest to 1 if $op1 == $op2, else 0
+            emit("xor " + result_val_reg + ", " + op1_reg + ", " + op2_reg);
+            emit("sltiu " + result_val_reg + ", " + result_val_reg + ", 1"); // Set to 1 if (op1_reg ^ op2_reg) is 0
+        }
+    } else if (inst->pureFunctionName == "__builtin_ne_int") {
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_ne_int needs a destination register."); } else {
+            // (op1 != op2) -> set $dest to 1 if $op1 != $op2, else 0
+            emit("xor " + result_val_reg + ", " + op1_reg + ", " + op2_reg);
+            emit("sltu " + result_val_reg + ", $zero, " + result_val_reg); // Set to 1 if (op1_reg ^ op2_reg) is non-zero
+        }
+    } else if (inst->pureFunctionName == "__builtin_lt_int") { // op1 < op2
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_lt_int needs a destination register."); } else {
+            emit("slt " + result_val_reg + ", " + op1_reg + ", " + op2_reg);
+        }
+    } else if (inst->pureFunctionName == "__builtin_le_int") { // op1 <= op2
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_le_int needs a destination register."); } else {
+            // (op1 <= op2)  is !(op2 < op1)
+            emit("slt " + result_val_reg + ", " + op2_reg + ", " + op1_reg);  // $result = op2 < op1
+            emit("xori " + result_val_reg + ", " + result_val_reg + ", 1"); // $result = !(op2 < op1)
+        }
+    } else if (inst->pureFunctionName == "__builtin_gt_int") { // op1 > op2
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_gt_int needs a destination register."); } else {
+            emit("slt " + result_val_reg + ", " + op2_reg + ", " + op1_reg); // (op1 > op2) is (op2 < op1)
+        }
+    } else if (inst->pureFunctionName == "__builtin_ge_int") { // op1 >= op2
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_ge_int needs a destination register."); } else {
+            // (op1 >= op2) is !(op1 < op2)
+            emit("slt " + result_val_reg + ", " + op1_reg + ", " + op2_reg);  // $result = op1 < op2
+            emit("xori " + result_val_reg + ", " + result_val_reg + ", 1"); // $result = !(op1 < op2)
         }
     } else {
         emit("# ERROR: Unknown pure function in CallPureInst: " + inst->pureFunctionName);
@@ -330,7 +356,24 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::JumpInst> inst) {
 }
 
 void MipsCodeGenerator::visit(std::shared_ptr<IR::CondJumpInst> inst) {
-    // ... placeholder ...
+    if (!currentFunctionContext || !inst || !inst->condition || !inst->trueTarget || !inst->falseTarget) {
+        emit("# ERROR: CondJumpInst visited with null context, instruction, condition, or target labels.");
+        return;
+    }
+    emit("# CondJumpInst: if (" + inst->condition->toString() + ") goto " + inst->trueTarget->labelName + " else goto " + inst->falseTarget->labelName);
+
+    std::string cond_reg = currentFunctionContext->ensureOperandInRegister(inst->condition);
+
+    // inst->trueTarget is the label if condition is true (non-zero)
+    // inst->falseTarget is the label if condition is false (zero)
+    emit("bnez " + cond_reg + ", " + inst->trueTarget->labelName); // Branch if Not Equal to Zero
+    emit("nop"); // Branch delay slot
+
+    emit("j " + inst->falseTarget->labelName); // Jump to false target if condition was zero (didn't take bnez)
+    emit("nop"); // Branch delay slot
+
+    currentFunctionContext->releaseRegister(cond_reg);
+    emit("# --- End of CondJumpInst ---");
 }
 
 void MipsCodeGenerator::visit(std::shared_ptr<IR::CallNormalInst> inst) {
@@ -431,6 +474,7 @@ MipsFunctionContext::MipsFunctionContext(std::shared_ptr<IR::NormalIRFunction> f
         // Handle error or return, as context is invalid without a function
         return;
     }
+    this->epilogueLabel = irFunction->name + "_epilogue"; // Initialize epilogue label
 
     // 1. Calculate total size needed for parameters (if saved to stack) and local variables.
     int currentLocalOffset = 0; // Negative offsets from $fp
@@ -491,6 +535,7 @@ void MipsFunctionContext::generatePrologue() {
 void MipsFunctionContext::generateEpilogue() {
     if (!irFunction)
         return;
+    generator->emitLabel(this->epilogueLabel); // Emit the epilogue label
     generator->emit("# Epilogue for " + irFunction->name);
     // $v0 should have the return value if any (set by visit(ReturnInst))
 
@@ -502,8 +547,8 @@ void MipsFunctionContext::generateEpilogue() {
     // Restore $sp to its value before this function's frame was allocated.
     // The $sp was decremented by frameSize in the prologue.
     generator->emit("addiu $sp, $sp, " + std::to_string(frameSize));  // Deallocate frame
-    this->generator->emit("jr $ra");
-    this->generator->emit("nop");  // Branch delay slot
+    generator->emit("jr $ra");
+    generator->emit("nop");  // Branch delay slot
 }
 
 std::string MipsFunctionContext::ensureOperandInRegister(std::shared_ptr<IR::IROperand> operand) {
@@ -642,17 +687,22 @@ void MipsFunctionContext::spillRegister(const std::string& reg) {
 void MipsCodeGenerator::generatePrintfImplementation() {
     emitLabel("printf");
 
-    // Standard function prologue for printf
-    emit("addi $sp, $sp, -20");  // Space for $ra, $fp, $s0, $s1, $s2 (5 words)
-    emit("sw $ra, 16($sp)");
-    emit("sw $fp, 12($sp)");
-    emit("sw $s0, 8($sp)");  // $s0 will be format string pointer
-    emit("sw $s1, 4($sp)");  // $s1 will be current char from format string / temp for arg (stores potential int arg)
-    emit("sw $s2, 0($sp)");  // $s2 can be used to point to next arg ($a2, $a3, stack) if handling multiple % specifiers
+    // Prologue to save $a0-$a3 and setup arg processing registers
+    emit("addi $sp, $sp, -32");  // $ra, $fp, $s0-$s4 (7 regs) -> make it 32 for 8 words alignment
+    emit("sw $ra, 28($sp)");
+    emit("sw $fp, 24($sp)");
+    emit("sw $s0, 20($sp)"); // format string pointer ($a0)
+    emit("sw $s1, 16($sp)"); // saved $a1 (first vararg)
+    emit("sw $s2, 12($sp)"); // saved $a2 (second vararg)
+    emit("sw $s3, 8($sp)");  // saved $a3 (third vararg)
+    emit("sw $s4, 4($sp)");  // vararg counter (0 -> $s1, 1 -> $s2, 2 -> $s3)
     emit("move $fp, $sp");
 
-    emit("move $s0, $a0");  // Copy format string address to $s0
-    emit("move $s1, $a1");  // Copy first vararg ($a1) to $s1 (potential int for %d)
+    emit("move $s0, $a0");      // Format string pointer
+    emit("move $s1, $a1");      // Save $a1
+    emit("move $s2, $a2");      // Save $a2
+    emit("move $s3, $a3");      // Save $a3
+    emit("li $s4, 0");          // vararg_counter = 0 (use $s1 next)
 
     emitLabel("printf_loop_start");
     emit("lb $t0, 0($s0)");              // Load current character of format string
@@ -674,11 +724,30 @@ void MipsCodeGenerator::generatePrintfImplementation() {
     emit("nop");                                          // Branch delay slot
 
     // It is '%d'
-    emit("move $a0, $s1");  // Move integer value (from original $a1, now in $s1) to $a0 for syscall
-    emit("li $v0, 1");      // Syscall for print_integer
+    emit("move $t1, $s1");      // Default to arg1 ($s1) for $a0 of syscall
+    emit("beq $s4, 1, printf_use_arg2"); // If counter == 1, use arg2 ($s2)
+    emit("nop");
+    emit("beq $s4, 2, printf_use_arg3"); // If counter == 2, use arg3 ($s3)
+    emit("nop");
+    // If counter is 0 ($s4 == 0), $t1 already has $s1. Go to print.
+    emit("j printf_perform_print_int");
+    emit("nop");
+
+    emitLabel("printf_use_arg2");
+    emit("move $t1, $s2");      // Use arg2 ($s2) for $a0 of syscall
+    emit("j printf_perform_print_int");
+    emit("nop");
+
+    emitLabel("printf_use_arg3");
+    emit("move $t1, $s3");      // Use arg3 ($s3) for $a0 of syscall
+    // Fall through to printf_perform_print_int
+
+    emitLabel("printf_perform_print_int");
+    emit("move $a0, $t1");      // Integer to print is in $t1, move to $a0 for syscall
+    emit("li $v0, 1");          // Syscall for print_integer
     emit("syscall");
-    // TODO: Advance to next vararg ($s2 -> $a2, etc.) if we handle multiple %d.
-    emit("j printf_loop_continue");  // Continue processing rest of format string
+    emit("addi $s4, $s4, 1");   // Increment vararg counter
+    emit("j printf_loop_continue");
     emit("nop");                     // Branch delay slot
 
     emitLabel("printf_handle_literal_percent");
@@ -712,13 +781,15 @@ void MipsCodeGenerator::generatePrintfImplementation() {
     emit("nop");  // Branch delay slot
 
     emitLabel("printf_end");
-    // Standard function epilogue
-    emit("lw $s2, 0($sp)");
-    emit("lw $s1, 4($sp)");
-    emit("lw $s0, 8($sp)");
-    emit("lw $fp, 12($sp)");
-    emit("lw $ra, 16($sp)");
-    emit("addi $sp, $sp, 20");
+    // Restore $s0-$s4, $fp, $ra
+    emit("lw $s4, 4($sp)");
+    emit("lw $s3, 8($sp)");
+    emit("lw $s2, 12($sp)");
+    emit("lw $s1, 16($sp)");
+    emit("lw $s0, 20($sp)");
+    emit("lw $fp, 24($sp)");
+    emit("lw $ra, 28($sp)");
+    emit("addi $sp, $sp, 32");
     emit("jr $ra");
     emit("nop");  // Branch delay slot
 }

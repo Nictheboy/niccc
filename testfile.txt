@@ -1,24 +1,18 @@
-int sum(int x,int y){   //sum
-    return x+y;
+int fib(int i){
+    if (i == 1) {
+        printf("fib(%d) = %d\n", i, 1);
+        return 1;
+    }
+    if (i == 2) {
+        printf("fib(%d) = %d\n", i, 1);
+        return 1;
+    }
+    int ret = fib(i - 1) + fib(i - 2);
+    printf("fib(%d) = %d\n", i, ret);
+    return ret;
 }
-int difference(int x,int y){
-    return x-y;//minus
-}
-int product(int x,int y){   //multi
-    return (x*y);
-}
-int div(int x,int y){
-    return x/y; //div
-}
-int main() {
-    int a,b,c,d,e,result=0;
-    a = getint();
-    b = getint();
-    c = getint();
-    d = getint();
-    e = getint();
-    e = -e+c*d-a%b+c/(a+b)+sum(a,b)-difference(c,d)*product(a,b)+div(a,c);
-    result = result + e*a;
-    printf("result is %d.", result);
+int main () {
+    printf("%d, %d\n", 1, 2);
+    printf(fib(getint()));
     return 0;
 }

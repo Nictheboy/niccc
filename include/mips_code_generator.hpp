@@ -157,6 +157,7 @@ class MipsFunctionContext {
     int maxArgsPassed;       // 此函数调用其他函数时传递的最大参数数量 (用于预留栈空间)
     int frameSize;           // <<< ADDED frameSize HERE
     int totalLocalVarSize;   // Added to store size of local variables
+    std::string epilogueLabel; // Added for jumping to epilogue from return statements
 
     // 变量位置映射：IRVariable名 -> (寄存器名 或 栈偏移量)
     // std::variant<std::string (reg), int (stack_offset)>

@@ -67,12 +67,8 @@ class IRGenerator {
     void visitBlockItem(PNNode node);
 
     void visitStmt(PNNode node);
-    void visitAssignStmt(PNNode lvalNode, PNNode expNode);
-    void visitIfStmt(PNNode condExpNode, PNNode thenStmtNode, PNNode elseStmtNode /*nullable*/);
-    void visitWhileStmt(PNNode condExpNode, PNNode bodyStmtNode);
-    void visitReturnStmt(PNNode expNode /*nullable*/);
-    void visitExpStmt(PNNode expNode /*nullable*/);
-    // visitControlStmt (break, continue)
+    void visitIfStmt(PNNode node);
+    void visitReturnStmt(PNNode node /* PNode expNode nullable, but ReturnStmt AST node is passed */);
 
     // 表达式 (返回 std::shared_ptr<IR::IROperand>，通常是一个 IR::IRVariable)
     std::shared_ptr<IR::IROperand> visitExp(PNNode node);

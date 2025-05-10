@@ -510,9 +510,129 @@ void IRGenerator::visitReturnStmt(PNNode node) {
         // The IR verifier or later stages should catch this inconsistency if the function expects a value.
     }
 
-    auto actual_return_inst = std::make_shared<IR::ReturnInst>(return_value_operand);
-    addInstruction(actual_return_inst);
-    std::cerr << "[IR_GEN] visitReturnStmt: ReturnInst added to function '" << currentNormalFunction->name << "'." << std::endl;
+    // Ensure currentNormalFunction is valid before adding instruction.
+    if (this->currentNormalFunction) {
+        auto actual_return_inst = std::make_shared<IR::ReturnInst>(return_value_operand);
+        addInstruction(actual_return_inst);
+        std::cerr << "[IR_GEN] visitReturnStmt: ReturnInst added to function '" << currentNormalFunction->name << "'." << std::endl;
+    } else {
+        std::cerr << "[IR_GEN_ERR] visitReturnStmt: currentNormalFunction is null. Cannot add ReturnInst." << std::endl;
+    }
+}
+
+void IRGenerator::visitIfStmt(PNNode node) {
+    std::cerr << "[IR_GEN] visitIfStmt() called for node: " << (node ? node->name : "null") << " with " << (node ? node->children.size() : 0) << " children." << std::endl;
+    if (!currentNormalFunction) {
+        std::cerr << "[IR_GEN_ERR] visitIfStmt: No current function context." << std::endl;
+        return;
+    }
+    if (!node || node->name != "Stmt" || node->children.size() < 3) { // if ( Cond ) Stmt ; else Stmt (at least 'if', Cond, '(', ')', Stmt)
+                                                                    // Based on typical grammar: Stmt -> IF LPAREN Exp RPAREN Stmt (ELSE Stmt)?
+                                                                    // Children of Stmt for 'if':
+                                                                    // 0: "if" (Terminal)
+                                                                    // 1: "(" (Terminal)
+                                                                    // 2: Exp (NonTerminal) - Condition
+                                                                    // 3: ")" (Terminal)
+                                                                    // 4: Stmt (NonTerminal) - Then branch
+                                                                    // 5: (optional) "else" (Terminal)
+                                                                    // 6: (optional) Stmt (NonTerminal) - Else branch
+        std::cerr << "[IR_GEN_ERR] visitIfStmt: Invalid IfStmt structure or insufficient children. Name: " << (node ? node->name : "null") << ", Child count: " << (node ? node->children.size() : 0) << std::endl;
+        return;
+    }
+
+    // Extract condition (child at index 2)
+    auto cond_exp_node = node->children.at(2);
+    if (!cond_exp_node) {
+        std::cerr << "[IR_GEN_ERR] visitIfStmt: Condition Exp node is null." << std::endl;
+        return;
+    }
+    std::cerr << "[IR_GEN] visitIfStmt: Visiting condition Exp node." << std::endl;
+    std::shared_ptr<IR::IROperand> cond_operand = this->dispatchVisitExp(cond_exp_node);
+    if (!cond_operand) {
+        std::cerr << "[IR_GEN_ERR] visitIfStmt: Failed to generate IR for condition." << std::endl;
+        return;
+    }
+
+    // Extract then_statement (child at index 4)
+    auto then_stmt_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(4));
+    if (!then_stmt_node || then_stmt_node->name != "Stmt") {
+         std::cerr << "[IR_GEN_ERR] visitIfStmt: Then Stmt node is invalid or not a Stmt. Found: " << (then_stmt_node ? then_stmt_node->name : "null") << std::endl;
+        return;
+    }
+
+
+    std::shared_ptr<IR::IRLabelOperand> then_label = createLabel(".L_if_then_");
+    std::shared_ptr<IR::IRLabelOperand> else_label = createLabel(".L_if_else_");
+    std::shared_ptr<IR::IRLabelOperand> endif_label = createLabel(".L_if_endif_");
+
+    bool has_else = false;
+    PNNode else_stmt_node = nullptr;
+
+    if (node->children.size() > 6) { // Check for 'else' keyword and then else Stmt
+        auto else_keyword_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(5));
+        if (else_keyword_node && else_keyword_node->token && else_keyword_node->token->matched == "else") {
+            if (node->children.size() > 6) {
+                 else_stmt_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(6));
+                if (else_stmt_node && else_stmt_node->name == "Stmt") {
+                    has_else = true;
+                    std::cerr << "[IR_GEN] visitIfStmt: Detected else branch." << std::endl;
+                } else {
+                    std::cerr << "[IR_GEN_WARN] visitIfStmt: 'else' keyword found but subsequent Stmt is invalid or not a Stmt. Found: " << (else_stmt_node ? else_stmt_node->name : "null") << std::endl;
+                }
+            } else {
+                 std::cerr << "[IR_GEN_WARN] visitIfStmt: 'else' keyword found but no subsequent Stmt node." << std::endl;
+            }
+        }
+    }
+
+
+    // IR:
+    // <eval condition>
+    // CondJumpInst cond_operand, (has_else ? else_label : endif_label)  // Jump to else/endif if condition is false (0)
+    // then_label: (this label might be optimized out if CondJump jumps on true)
+    // <then_block_code>
+    // JumpInst endif_label (if has_else)
+    // else_label: (if has_else)
+    // <else_block_code> (if has_else)
+    // endif_label:
+    // <rest_of_code>
+
+    // We'll use a CondJump that jumps if condition is false (0)
+    // If condition is true (non-zero), execution falls through to 'then' block.
+    // addInstruction(std::make_shared<IR::CondJumpInst>(cond_operand, (has_else ? else_label : endif_label), false /* jump if false / zero */));
+    // std::cerr << "[IR_GEN] visitIfStmt: Added CondJumpInst. Target if false: " << (has_else ? else_label->labelName : endif_label->labelName) << std::endl;
+
+    if (has_else) {
+        addInstruction(std::make_shared<IR::CondJumpInst>(cond_operand, then_label, else_label));
+        std::cerr << "[IR_GEN] visitIfStmt: Added CondJumpInst (if-else). True target: " << then_label->labelName << ", False target: " << else_label->labelName << std::endl;
+    } else {
+        addInstruction(std::make_shared<IR::CondJumpInst>(cond_operand, then_label, endif_label));
+        std::cerr << "[IR_GEN] visitIfStmt: Added CondJumpInst (if-then). True target: " << then_label->labelName << ", False target: " << endif_label->labelName << std::endl;
+    }
+
+    // Then block
+    addInstruction(std::make_shared<IR::LabelInst>(then_label->labelName));
+    std::cerr << "[IR_GEN] visitIfStmt: Added LabelInst for then_label: " << then_label->labelName << std::endl;
+    std::cerr << "[IR_GEN] visitIfStmt: Visiting then_stmt_node." << std::endl;
+    symbolTable.enterScope(); // New scope for then block
+    this->visitStmt(then_stmt_node);
+    symbolTable.leaveScope();
+
+    if (has_else) {
+        addInstruction(std::make_shared<IR::JumpInst>(endif_label)); // After then block, jump to endif
+        std::cerr << "[IR_GEN] visitIfStmt: Added JumpInst to " << endif_label->labelName << " after then block." << std::endl;
+
+        addInstruction(std::make_shared<IR::LabelInst>(else_label->labelName));
+        std::cerr << "[IR_GEN] visitIfStmt: Added LabelInst for " << else_label->labelName << "." << std::endl;
+        std::cerr << "[IR_GEN] visitIfStmt: Visiting else_stmt_node." << std::endl;
+        symbolTable.enterScope(); // New scope for else block
+        this->visitStmt(else_stmt_node);
+        symbolTable.leaveScope();
+    }
+
+    addInstruction(std::make_shared<IR::LabelInst>(endif_label->labelName));
+    std::cerr << "[IR_GEN] visitIfStmt: Added LabelInst for " << endif_label->labelName << "." << std::endl;
+    std::cerr << "[IR_GEN] visitIfStmt: Completed." << std::endl;
 }
 
 void IRGenerator::visitStmt(PNNode stmtNode) {
@@ -535,6 +655,9 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
             this->visitReturnStmt(stmtNode);  // visitReturnStmt itself takes the Stmt node
         }
         // ... other keyword-based statements like "if", "while", etc.
+        else if (terminal_child->token->matched == "if") { // Added for if statement
+            this->visitIfStmt(stmtNode);
+        }
         else {
             std::cerr << "[IR_GEN] visitStmt: Unhandled keyword-based statement start: " << terminal_child->token->matched << std::endl;
         }
@@ -595,6 +718,9 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
         ) {
             std::cerr << "[IR_GEN] visitStmt: Visiting expression child " << non_terminal_child->name << " for side effects (ExpStmt)." << std::endl;
             this->dispatchVisitExp(non_terminal_child);  // Visit the expression, result is discarded
+        } else if (non_terminal_child->name == "Block") { // Added to handle Stmt -> Block
+            std::cerr << "[IR_GEN] visitStmt: Detected Block child. Dispatching to visitBlock." << std::endl;
+            this->visitBlock(non_terminal_child, true); // Create new scope for the block by default
         } else {
             std::cerr << "[IR_GEN] visitStmt: Unhandled non-terminal statement type: " << non_terminal_child->name << std::endl;
         }
@@ -711,6 +837,26 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitFunctionCall(PTNode idNode, PNN
 
     std::string func_name = idNode->token->matched;
     std::vector<std::shared_ptr<IR::IROperand>> ir_args = visitFuncRParams(paramsNode);
+
+    // Special handling for printf(int_expr)
+    if (func_name == "printf" && ir_args.size() == 1) {
+        auto first_arg = ir_args.at(0);
+        if (first_arg && first_arg->type) {
+            if (auto simple_type = std::dynamic_pointer_cast<IR::SimpleIRType>(first_arg->type)) {
+                if (simple_type->kind == IR::SimpleTypeKind::INTEGER) {
+                    std::cerr << "[IR_GEN] visitFunctionCall: Detected printf with single integer argument. Prepending format string \"%d\\n\"." << std::endl;
+                    if (this->program) {
+                        std::string format_str_label = this->program->addStringLiteral("%d\n");
+                        auto format_str_operand = std::make_shared<IR::IRLabelOperand>(format_str_label);
+                        ir_args.insert(ir_args.begin(), format_str_operand);
+                         std::cerr << "[IR_GEN] visitFunctionCall: New ir_args size for printf: " << ir_args.size() << std::endl;
+                    } else {
+                        std::cerr << "[IR_GEN_ERR] visitFunctionCall: this->program is null! Cannot add format string for printf." << std::endl;
+                    }
+                }
+            }
+        }
+    }
 
     // Before creating CallNormalInst, check if the function exists in the program
     if (!this->program || (!this->program->normalFunctions.count(func_name) && !this->program->pureFunctions.count(func_name))) {
@@ -1114,14 +1260,16 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitAddExp(PNNode node) {
 }
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitExp(PNNode node) {  // node is Exp, LOrExp, LAndExp, EqExp, RelExp, AddExp, or MulExp
-    std::cerr << "[IR_GEN] visitExp (generic pass-through) called for node: " << (node ? node->name : "<null_node>") << std::endl;
+    std::cerr << "[IR_GEN] visitExp called for node: " << (node ? node->name : "<null_node>") << std::endl;
     if (!node || node->children.empty()) {
-        std::cerr << "[IR_GEN] visitExp: Node " << (node ? node->name : "<null_node>") << " is null or has no children." << std::endl;
+        std::cerr << "[IR_GEN_ERR] visitExp: Node " << (node ? node->name : "<null_node>") << " is null or has no children." << std::endl;
         return nullptr;
     }
-    // These nodes, in the absence of an operator, pass to their first child (next precedence level).
-    PNode child_ast_node = node->children.at(0);  // PNode is std::shared_ptr<AST::Node>
-    std::cerr << "[IR_GEN] visitExp: Dispatching to child of " << node->name << "." << std::endl;
+    // An Exp node itself should always pass to its child (e.g., LOrExp or AddExp if grammar is Exp -> AddExp)
+    // Other expression types like LOrExp, LAndExp, EqExp, RelExp, AddExp, MulExp should have their OWN specific visitors handle them if they are the top node.
+    // This function (visitExp) is now primarily for the 'Exp' production itself.
+    PNode child_ast_node = node->children.at(0); 
+    std::cerr << "[IR_GEN] visitExp: Node " << node->name << " dispatching to its child." << std::endl;
     return this->dispatchVisitExp(child_ast_node);
 }
 
@@ -1140,26 +1288,48 @@ std::shared_ptr<IR::IROperand> IRGenerator::dispatchVisitExp(PNode node_base) {
         std::cerr << "[IR_GEN] dispatchVisitExp: Dispatching for NonTerminalNode: " << pn_node->name << std::endl;
         if (pn_node->name == "Exp") { // Exp itself is often a pass-through to higher precedence
             return this->visitExp(pn_node);                            
-        } else if (pn_node->name == "LOrExp") { // Assuming LOrExp, LAndExp, EqExp, RelExp also have specific visitors or are handled by visitExp if they are simple pass-throughs
-            // If they have specific logic (e.g., short-circuiting), they need direct calls to their visitors.
-            // For now, assuming they might be like Exp or need specific handlers not yet fully implemented for complex logic.
-            // If their structure is always Child_0 op Child_1 ... then they need their own visitXXX method called here.
-            // Based on typical expression grammars, these often reduce to their first child if no operator is present at their level.
-            // Let's assume for now, like Exp, if they are just precedence wrappers without an op at their level, visitExp is fine.
-            // However, if they *do* have operators, visitExp will incorrectly take only the first child.
-            // THIS NEEDS VERIFICATION based on grammar and how visitLOrExp etc. are (or should be) implemented.
-            // For now, to fix AddExp/MulExp specifically:
-            return this->visitExp(pn_node); // Placeholder - this might be wrong for LOrExp etc. if they have operators.
+        } else if (pn_node->name == "LOrExp") { 
+            // TODO: Implement visitLOrExp for short-circuiting. For now, assuming it has its own visitor or direct child dispatch if simple.
+            // If LOrExp always has an LAndExp child (or similar fixed structure without ops at its level), dispatching to child is okay.
+            // If LOrExp can have operators like LOrExp -> LOrExp '||' LAndExp, it needs its own visitLOrExp.
+            // Let's assume for now a simple pass-through to its first child if no operator is present AT THIS LEVEL.
+            // This logic needs to be robust for your specific grammar for LOrExp, LAndExp, etc.
+            std::cerr << "[IR_GEN_DBG] dispatchVisitExp: LOrExp encountered. Assuming it has its own visitor or will pass to child if no ops." << std::endl;
+            // Fallback: If LOrExp has operators, it should have its own visitLOrExp. If it's just a wrapper, child dispatch is ok.
+            // For now, directly call visitExp which should dispatch to its child if it's a simple wrapper.
+            // If it has specific logic (like its own operators), it must have a dedicated visitor.
+            // This part is tricky without knowing the exact grammar productions for LOrExp, LAndExp.
+            // Let's assume for now it will call its own specific visitor if defined, or fall through to generic visitExp (which goes to child).
+            // The key is that if `pn_node` IS an LOrExp, and `visitLOrExp` exists, it should be called.
+            // For simplicity and directness, if it's LOrExp and has operators, it *must* have a visitLOrExp.
+            // If it's just LOrExp -> LAndExp, then visitExp(pn_node) -> dispatchVisitExp(child_of_LOrExp) works.
+            // Based on the error logs, it seems like the higher level expressions (RelExp, EqExp) were being passed to the generic visitExp,
+            // which then just took their first child, bypassing their specific visitors.
+            // The fix below is to ensure direct calls for these.
+            if (pn_node->children.size() > 1) { // Indicates it might have operators like LOrExp op LAndExp
+                 std::cerr << "[IR_GEN_WARN] dispatchVisitExp: LOrExp with multiple children. Proper visitLOrExp needed for operators." << std::endl;
+                // return this->visitLOrExp(pn_node); // IF YOU IMPLEMENT visitLOrExp
+            }
+            // Default to pass-through if no specific LOrExp visitor with ops for now
+            if (pn_node->children.empty()) { std::cerr << "[IR_GEN_ERR] dispatchVisitExp: LOrExp node has no children." << std::endl; return nullptr;}
+            return this->dispatchVisitExp(pn_node->children.at(0)); 
         } else if (pn_node->name == "LAndExp") {
-            return this->visitExp(pn_node); // Placeholder
+            // Similar logic as LOrExp
+            std::cerr << "[IR_GEN_DBG] dispatchVisitExp: LAndExp encountered." << std::endl;
+            if (pn_node->children.size() > 1) {
+                std::cerr << "[IR_GEN_WARN] dispatchVisitExp: LAndExp with multiple children. Proper visitLAndExp needed for operators." << std::endl;
+                // return this->visitLAndExp(pn_node); // IF YOU IMPLEMENT visitLAndExp
+            }
+            if (pn_node->children.empty()) { std::cerr << "[IR_GEN_ERR] dispatchVisitExp: LAndExp node has no children." << std::endl; return nullptr;}
+            return this->dispatchVisitExp(pn_node->children.at(0)); 
         } else if (pn_node->name == "EqExp") {
-            return this->visitExp(pn_node); // Placeholder
+            return this->visitEqExp(pn_node); 
         } else if (pn_node->name == "RelExp") {
-            return this->visitExp(pn_node); // Placeholder
+            return this->visitRelExp(pn_node); 
         } else if (pn_node->name == "AddExp") {
-            return this->visitAddExp(pn_node); // CORRECTED: Call visitAddExp directly
+            return this->visitAddExp(pn_node);
         } else if (pn_node->name == "MulExp") {
-            return this->visitMulExp(pn_node); // CORRECTED: Call visitMulExp directly
+            return this->visitMulExp(pn_node);
         } else if (pn_node->name == "UnaryExp") {
             return this->visitUnaryExp(pn_node);
         } else if (pn_node->name == "PrimaryExp") {
@@ -1728,6 +1898,122 @@ void IRGenerator::visitConstDef(PNNode const_def_node) {
 
     std::cerr << "[IR_GEN] visitConstDef: Calling visitDecl with " << actual_decl_items.size() << " items." << std::endl;
     this->visitDecl(synthetic_decl_list_node, base_ir_type, true /*is_const*/);
+}
+
+std::shared_ptr<IR::IROperand> IRGenerator::visitRelExp(PNNode node) {
+    std::cerr << "[IR_GEN] visitRelExp() called for node: " << (node ? node->name : "<null_node>")
+              << " with " << (node ? node->children.size() : 0) << " children." << std::endl;
+    // AST: RelExp -> AddExp ( ( '<' | '>' | '<=' | '>=' ) AddExp )*
+    if (!node || node->children.empty()) {
+        std::cerr << "[IR_GEN_ERR] visitRelExp: Null or empty RelExp node." << std::endl;
+        return nullptr;
+    }
+
+    std::shared_ptr<IR::IROperand> current_lhs_operand = this->dispatchVisitExp(node->children.at(0)); // Process first AddExp
+    if (!current_lhs_operand) {
+        std::cerr << "[IR_GEN_ERR] visitRelExp: Failed to get LHS operand from child of RelExp." << std::endl;
+        return nullptr;
+    }
+    std::cerr << "[IR_GEN] visitRelExp: Initial LHS from first AddExp: " << current_lhs_operand->toString() << std::endl;
+
+    for (size_t i = 1; (i + 1) < node->children.size(); i += 2) {
+        auto op_terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(i));
+        auto rhs_ast_node = node->children.at(i + 1); // This is PNode
+
+        if (!op_terminal_node || !op_terminal_node->token || !rhs_ast_node) {
+            std::cerr << "[IR_GEN_ERR] visitRelExp: Malformed operator or RHS AST node in RelExp." << std::endl;
+            return nullptr;
+        }
+
+        std::string op_str = op_terminal_node->token->matched;
+        std::cerr << "[IR_GEN] visitRelExp: Processing operator '" << op_str << "'." << std::endl;
+
+        std::shared_ptr<IR::IROperand> rhs_operand = this->dispatchVisitExp(rhs_ast_node);
+        if (!rhs_operand) {
+            std::cerr << "[IR_GEN_ERR] visitRelExp: Failed to get RHS operand for operator " << op_str << std::endl;
+            return nullptr;
+        }
+        std::cerr << "[IR_GEN] visitRelExp: RHS for operator '" << op_str << "': " << rhs_operand->toString() << std::endl;
+
+        std::string pure_func_name;
+        if (op_str == "<") {
+            pure_func_name = "__builtin_lt_int";
+        } else if (op_str == "<=") {
+            pure_func_name = "__builtin_le_int";
+        } else if (op_str == ">") {
+            pure_func_name = "__builtin_gt_int";
+        } else if (op_str == ">=") {
+            pure_func_name = "__builtin_ge_int";
+        } else {
+            std::cerr << "[IR_GEN_ERR] visitRelExp: Unknown operator: " << op_str << std::endl;
+            return nullptr;
+        }
+
+        auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_rel_");
+        addInstruction(std::make_shared<IR::CallPureInst>(pure_func_name, 
+                                                       std::vector<std::shared_ptr<IR::IROperand>>{current_lhs_operand, rhs_operand},
+                                                       std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
+        current_lhs_operand = result_temp;
+        std::cerr << "[IR_GEN] visitRelExp: Generated CallPureInst for '" << op_str << "', result in " << result_temp->name << std::endl;
+    }
+    std::cerr << "[IR_GEN] visitRelExp: Final result: " << current_lhs_operand->toString() << std::endl;
+    return current_lhs_operand;
+}
+
+std::shared_ptr<IR::IROperand> IRGenerator::visitEqExp(PNNode node) {
+    std::cerr << "[IR_GEN] visitEqExp() called for node: " << (node ? node->name : "<null_node>")
+              << " with " << (node ? node->children.size() : 0) << " children." << std::endl;
+    // AST: EqExp -> RelExp ( ( '==' | '!=' ) RelExp )*
+    if (!node || node->children.empty()) {
+        std::cerr << "[IR_GEN_ERR] visitEqExp: Null or empty EqExp node." << std::endl;
+        return nullptr;
+    }
+
+    std::shared_ptr<IR::IROperand> current_lhs_operand = this->dispatchVisitExp(node->children.at(0)); // Process first RelExp
+    if (!current_lhs_operand) {
+        std::cerr << "[IR_GEN_ERR] visitEqExp: Failed to get LHS operand from child of EqExp." << std::endl;
+        return nullptr;
+    }
+    std::cerr << "[IR_GEN] visitEqExp: Initial LHS from first RelExp: " << current_lhs_operand->toString() << std::endl;
+
+    for (size_t i = 1; (i + 1) < node->children.size(); i += 2) {
+        auto op_terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(i));
+        auto rhs_ast_node = node->children.at(i + 1); // This is PNode
+
+        if (!op_terminal_node || !op_terminal_node->token || !rhs_ast_node) {
+            std::cerr << "[IR_GEN_ERR] visitEqExp: Malformed operator or RHS AST node in EqExp." << std::endl;
+            return nullptr;
+        }
+
+        std::string op_str = op_terminal_node->token->matched;
+        std::cerr << "[IR_GEN] visitEqExp: Processing operator '" << op_str << "'." << std::endl;
+
+        std::shared_ptr<IR::IROperand> rhs_operand = this->dispatchVisitExp(rhs_ast_node);
+        if (!rhs_operand) {
+            std::cerr << "[IR_GEN_ERR] visitEqExp: Failed to get RHS operand for operator " << op_str << std::endl;
+            return nullptr;
+        }
+        std::cerr << "[IR_GEN] visitEqExp: RHS for operator '" << op_str << "': " << rhs_operand->toString() << std::endl;
+
+        std::string pure_func_name;
+        if (op_str == "==") {
+            pure_func_name = "__builtin_eq_int";
+        } else if (op_str == "!=") {
+            pure_func_name = "__builtin_ne_int";
+        } else {
+            std::cerr << "[IR_GEN_ERR] visitEqExp: Unknown operator: " << op_str << std::endl;
+            return nullptr;
+        }
+
+        auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_eq_");
+        addInstruction(std::make_shared<IR::CallPureInst>(pure_func_name, 
+                                                       std::vector<std::shared_ptr<IR::IROperand>>{current_lhs_operand, rhs_operand},
+                                                       std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
+        current_lhs_operand = result_temp;
+        std::cerr << "[IR_GEN] visitEqExp: Generated CallPureInst for '" << op_str << "', result in " << result_temp->name << std::endl;
+    }
+    std::cerr << "[IR_GEN] visitEqExp: Final result: " << current_lhs_operand->toString() << std::endl;
+    return current_lhs_operand;
 }
 
 }  // namespace IRGenerator
