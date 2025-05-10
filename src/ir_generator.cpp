@@ -810,26 +810,47 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitPrimaryExp(PNNode node) {
     auto first_child_base = node->children.at(0);
 
     // Case 1: Parenthesized Expression '(' Exp ')'
-    if (auto non_terminal_exp_child = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child_base)) {
-        if (non_terminal_exp_child->name == "Exp") {
-            std::cerr << "[IR_GEN] visitPrimaryExp: Visiting parenthesized Exp." << std::endl;
-            return this->dispatchVisitExp(non_terminal_exp_child);
+    // AST structure is typically: PrimaryExp(Terminal("("), NonTerminal("Exp"), Terminal(")"))
+    if (auto terminal_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
+        if (terminal_child->token && terminal_child->token->matched == "(") {
+            if (node->children.size() > 2) { // Need at least '(', Exp, ')'
+                // The actual expression is the second child.
+                auto exp_node_base = node->children.at(1); // This is PNode (std::shared_ptr<AST::Node>)
+                // We expect it to be a NonTerminalNode named "Exp"
+                if (auto exp_node_non_terminal = std::dynamic_pointer_cast<AST::NonTerminalNode>(exp_node_base)) {
+                    if (exp_node_non_terminal->name == "Exp") {
+                         std::cerr << "[IR_GEN] visitPrimaryExp: Visiting parenthesized Exp." << std::endl;
+                        return this->dispatchVisitExp(exp_node_non_terminal); // Dispatch on the actual Exp node
+                    }
+                }
+            }
+            // If structure is not '(', Exp, ')', then it's an error or unhandled variant.
+            std::cerr << "[IR_GEN_ERR] visitPrimaryExp: Malformed parenthesized expression. Expected '(', Exp, ')'." << std::endl;
+            return nullptr;
         }
-        // Case 2: LVal (variable usage)
-        else if (non_terminal_exp_child->name == "LVal") {
+        // If it's a terminal but not '(', it might be a number or string literal (handled below)
+    }
+
+    // Case 2: LVal (variable usage)
+    // This occurs if PrimaryExp -> LVal, and LVal is the first child (NonTerminalNode)
+    if (auto non_terminal_child = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child_base)) {
+        if (non_terminal_child->name == "LVal") {
             std::cerr << "[IR_GEN] visitPrimaryExp: Visiting LVal." << std::endl;
-            return this->visitLVal(non_terminal_exp_child);  // visitLVal returns IRVariable
+            return this->visitLVal(non_terminal_child);
         }
         // Case 3 (part 2): Number wrapped in a NonTerminalNode (e.g., PrimaryExp -> NumberNode -> TerminalToken)
-        else if (non_terminal_exp_child->name == "Number" && !non_terminal_exp_child->children.empty()) {
-            if (auto actual_number_terminal = std::dynamic_pointer_cast<AST::TerminalNode>(non_terminal_exp_child->children.at(0))) {
+        else if (non_terminal_child->name == "Number" && !non_terminal_child->children.empty()) {
+            if (auto actual_number_terminal = std::dynamic_pointer_cast<AST::TerminalNode>(non_terminal_child->children.at(0))) {
                 std::cerr << "[IR_GEN] visitPrimaryExp: Visiting Number (wrapped)." << std::endl;
                 return this->visitNumber(actual_number_terminal);
             }
         }
+        // If first child is NonTerminal but not LVal or Number, it's unhandled here, will fall to generic error.
     }
     // Case 3 (part 1) & 4: Number or String Literal as a direct TerminalNode child of PrimaryExp
+    // This 'else if' handles cases where the first child is a TerminalNode that is NOT '('.
     else if (auto terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
+        // This block will now only be reached if the first child is a TerminalNode, AND it wasn't '('
         if (terminal_node->token && !terminal_node->token->matched.empty()) {
             const std::string& matched_text = terminal_node->token->matched;
             // String Literal
