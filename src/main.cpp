@@ -47,8 +47,8 @@ int main(int argc, char* argv[]) {
         Parser::Parser parser(grammarRules, tokenDefinitions, scanContext);
         std::shared_ptr<AST::Node> astRoot = parser.parse(tokens);
         std::cout << "Parsing successful!" << std::endl;
-        // std::cout << "\nAST:" << std::endl;
-        // std::cout << astRoot->toString() << std::endl;
+        std::cout << "\nAST:" << std::endl;
+        std::cout << astRoot->toString() << std::endl;
         IRGenerator::IRGenerator irGenerator;
         auto irProgram = irGenerator.generate(astRoot);
         std::cout << "IR Program:" << std::endl;

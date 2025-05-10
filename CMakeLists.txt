@@ -30,6 +30,7 @@ if(NOT TARGET libniccc)
     set(LIB_SOURCES
         src/tokenizer_spec.cpp
         src/parser_spec.cpp
+        src/ir_generator.cpp
     )
     if(WIN32)
         set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
