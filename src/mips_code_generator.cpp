@@ -161,7 +161,11 @@ void MipsCodeGenerator::generateFunction(std::shared_ptr<IR::NormalIRFunction> n
     emitLabel(normalFunc->name);
     context.generatePrologue();
 
-    for (const auto& inst : normalFunc->instructions) {
+    // Iterate directly over normalFunc->instructions
+    for (const auto& inst : normalFunc->instructions) { 
+        if (!inst) continue; // Safety check for null instruction
+        
+        // Assuming manual dispatch for now based on existing pattern:
         if (auto returnInst = std::dynamic_pointer_cast<IR::ReturnInst>(inst)) {
             visit(returnInst);
         } else if (auto labelInst = std::dynamic_pointer_cast<IR::LabelInst>(inst)) {
@@ -172,10 +176,13 @@ void MipsCodeGenerator::generateFunction(std::shared_ptr<IR::NormalIRFunction> n
             visit(callNormalInst);
         } else if (auto assignInst = std::dynamic_pointer_cast<IR::AssignInst>(inst)) {
             visit(assignInst);
+        } else if (auto callPureInst = std::dynamic_pointer_cast<IR::CallPureInst>(inst)) {
+            visit(callPureInst);
+        } else if (auto condJumpInst = std::dynamic_pointer_cast<IR::CondJumpInst>(inst)) {
+            visit(condJumpInst); 
+        } else {
+            emit("# Unhandled IRInstruction type in MipsCodeGenerator::generateFunction: " + inst->toString());
         }
-        // Add other instruction types as needed
-        // else if (auto callPureInst = std::dynamic_pointer_cast<IR::CallPureInst>(inst)) { visit(callPureInst); }
-        // else if (auto condJumpInst = std::dynamic_pointer_cast<IR::CondJumpInst>(inst)) { visit(condJumpInst); }
     }
 
     context.generateEpilogue();
@@ -201,9 +208,115 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::ReturnInst> inst) {
     // Actual jr $ra and stack cleanup is in epilogue.
 }
 
-void MipsCodeGenerator::visit(std::shared_ptr<IR::CallPureInst> inst) { /* ... placeholder ... */ }
+void MipsCodeGenerator::visit(std::shared_ptr<IR::CallPureInst> inst) {
+    if (!currentFunctionContext || !inst) {
+        emit("# ERROR: CallPureInst visited outside function context or null instruction");
+        return;
+    }
+    emit("# CallPureInst: " + inst->toString());
+
+    std::shared_ptr<IR::IRVariable> dest_var = nullptr;
+    bool has_dest = false;
+
+    if (!inst->results.empty()) {
+        dest_var = inst->results[0]; // For expressions, assume the first result is the one we want.
+        has_dest = true;
+    } else {
+        // This case implies a pure function call that doesn't store its result anywhere, 
+        // which might be unusual for the builtins we're handling in expressions.
+        emit("# CallPureInst for " + inst->pureFunctionName + " has no result variables specified.");
+        // We might still need to evaluate it if arguments have side effects (not typical for pure ops) or for other reasons.
+        // For now, if no destination, we can't proceed with storing a result.
+    }
+
+    if (has_dest && !dest_var) {
+        // This would mean inst->results was not empty, but results[0] was null.
+        emit("# ERROR: CallPureInst has a result entry, but the IRVariable is null.");
+        return;
+    }
+
+    std::string op1_reg, op2_reg;
+    if (inst->arguments.size() >= 1) {
+        op1_reg = currentFunctionContext->ensureOperandInRegister(inst->arguments[0]);
+    } else {
+        emit("# ERROR: CallPureInst expects at least one argument for " + inst->pureFunctionName);
+        if(!op1_reg.empty() && op1_reg != "$zero") currentFunctionContext->releaseRegister(op1_reg); // op1_reg might be from a failed ensureOperand
+        return;
+    }
+
+    if (inst->arguments.size() >= 2) {
+        op2_reg = currentFunctionContext->ensureOperandInRegister(inst->arguments[1]);
+    }
+
+    std::string result_val_reg = "";
+
+    if (has_dest && dest_var) { // Only reserve a register if we have a valid destination
+        result_val_reg = currentFunctionContext->reserveRegister(); 
+    } else if (has_dest && !dest_var) { // Should be caught by earlier check
+         emit("# ERROR: CallPureInst has destination flag but dest_var is null (intermediate logic error)");
+         currentFunctionContext->releaseRegister(op1_reg);
+         if (!op2_reg.empty()) currentFunctionContext->releaseRegister(op2_reg);
+         return;
+    } 
+    // If !has_dest, result_val_reg remains empty. Instructions below should handle this (e.g. not use it or error out if they need it)
+
+    if (inst->pureFunctionName == "__builtin_add_int") {
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_add_int needs a destination register."); } else
+        emit("addu " + result_val_reg + ", " + op1_reg + ", " + op2_reg);
+    } else if (inst->pureFunctionName == "__builtin_sub_int") {
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_sub_int needs a destination register."); } else
+        emit("subu " + result_val_reg + ", " + op1_reg + ", " + op2_reg);
+    } else if (inst->pureFunctionName == "__builtin_mul_int") {
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_mul_int needs a destination register."); } else {
+            emit("multu " + op1_reg + ", " + op2_reg);
+            emit("mflo " + result_val_reg);
+        }
+    } else if (inst->pureFunctionName == "__builtin_div_int") { 
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_div_int needs a destination register."); } else {
+            emit("div " + op1_reg + ", " + op2_reg);
+            emit("mflo " + result_val_reg);
+        }
+    } else if (inst->pureFunctionName == "__builtin_mod_int") { 
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_mod_int needs a destination register."); } else {
+            emit("div " + op1_reg + ", " + op2_reg);
+            emit("mfhi " + result_val_reg);
+        }
+    } else if (inst->pureFunctionName == "__builtin_eq_int") { 
+        if (result_val_reg.empty()) { emit("# ERROR: __builtin_eq_int needs a destination register."); } else {
+            std::string temp_xor_flag = currentFunctionContext->reserveRegister(); 
+            emit("xor " + temp_xor_flag + ", " + op1_reg + ", " + op2_reg); 
+            emit("sltu " + result_val_reg + ", $zero, " + temp_xor_flag);   
+            emit("xori " + result_val_reg + ", " + result_val_reg + ", 1"); 
+            currentFunctionContext->releaseRegister(temp_xor_flag);
+        }
+    } else {
+        emit("# ERROR: Unknown pure function in CallPureInst: " + inst->pureFunctionName);
+    }
+
+    if (has_dest && dest_var && !result_val_reg.empty()) {
+        if (this->currentProgram && this->currentProgram->globalVariables.count(dest_var->name)) {
+            std::string dest_addr_reg = currentFunctionContext->reserveRegister();
+            emit("la " + dest_addr_reg + ", " + dest_var->name);
+            emit("sw " + result_val_reg + ", 0(" + dest_addr_reg + ")");
+            currentFunctionContext->releaseRegister(dest_addr_reg);
+            emit("# Stored result of pure call to global " + dest_var->name);
+        } else {
+            int offset = currentFunctionContext->getVarStackOffset(dest_var->name);
+            emit("sw " + result_val_reg + ", " + std::to_string(offset) + "($fp)");
+            emit("# Stored result of pure call to local " + dest_var->name + " at " + std::to_string(offset) + "($fp)");
+        }
+    }
+
+    currentFunctionContext->releaseRegister(op1_reg);
+    if (!op2_reg.empty()) {
+        currentFunctionContext->releaseRegister(op2_reg);
+    }
+    if (!result_val_reg.empty()) {
+        currentFunctionContext->releaseRegister(result_val_reg);
+    }
+}
+
 void MipsCodeGenerator::visit(std::shared_ptr<IR::LoadArrayInst> inst) { /* ... placeholder ... */ }
-void MipsCodeGenerator::visit(std::shared_ptr<IR::StoreArrayInst> inst) { /* ... placeholder ... */ }
 
 void MipsCodeGenerator::visit(std::shared_ptr<IR::LabelInst> inst) {
     emitLabel(inst->name);
@@ -310,67 +423,66 @@ std::string MipsCodeGenerator::getOperandRegister(std::shared_ptr<IR::IROperand>
 // --- MipsFunctionContext Class Implementation ---
 
 MipsFunctionContext::MipsFunctionContext(std::shared_ptr<IR::NormalIRFunction> func, MipsCodeGenerator* gen)
-    : irFunction(func),
-      generator(gen),
-      currentStackOffset(0),  // Will be set by prologue
-      maxArgsPassed(0),       // For now, not handling stack-passed args beyond $a0-$a3
-      frameSize(0),           // Will be calculated
-      totalLocalVarSize(0) {
-    // 1. Calculate total size needed for local variables.
-    //    Parameters passed in $a0-$a3 might also be stored to stack if their regs are needed.
-    //    For now, assume parameters are handled separately or copied to local slots if needed.
-    //    The `irFunction->locals` list contains explicitly declared local variables.
-    int currentLocalOffset = 0;
-    if (irFunction) {  // Check if irFunction is not null
-        for (const auto& local_pair : irFunction->locals) {
-            const auto& varName = local_pair.first;
-            const auto& var = local_pair.second;
-            if (varLocations.find(varName) == varLocations.end()) {  // Don't re-process params
-                varTypes[varName] = var->type;
-                currentLocalOffset -= 4;
-                // varLocations[varName] = currentLocalOffset; // Offset from $fp
-                varLocations[varName] = VarLocation(currentLocalOffset);
-            }
+    : irFunction(func), generator(gen), totalLocalVarSize(0), frameSize(0) {
+    if (!irFunction) {
+        // Handle error or return, as context is invalid without a function
+        return;
+    }
+
+    // 1. Calculate total size needed for parameters (if saved to stack) and local variables.
+    int currentLocalOffset = 0; // Negative offsets from $fp
+
+    // Process parameters first: assign them stack slots and add to varLocations
+    // These will be slots where $a0-$a3 (or stack-passed args) are stored by prologue.
+    for (size_t i = 0; i < irFunction->parameters.size(); ++i) {
+        const auto& param = irFunction->parameters[i];
+        if (param) {
+            currentLocalOffset -= 4; // Allocate 4 bytes for the parameter on stack
+            varLocations[param->name] = VarLocation(currentLocalOffset);
+            paramNamesAndOffsetsForPrologue.push_back({param->name, currentLocalOffset});
+            generator->emit("# Parameter '" + param->name + "' assigned stack offset: " + std::to_string(currentLocalOffset) + "($fp)");
+        }    
+    }
+
+    // Process local variables
+    for (const auto& local_pair : irFunction->locals) {
+        const auto& varName = local_pair.first;
+        // const auto& var = local_pair.second; // var is IRVariable
+        // Ensure we don't re-allocate space if a parameter name somehow clashes with a local
+        // (though symbol table should prevent this from IRGenerator side)
+        if (varLocations.find(varName) == varLocations.end()) { 
+            currentLocalOffset -= 4; // Allocate 4 bytes for the local variable
+            varLocations[varName] = VarLocation(currentLocalOffset);
+            generator->emit("# Local var '" + varName + "' assigned stack offset: " + std::to_string(currentLocalOffset) + "($fp)");
         }
     }
-    this->totalLocalVarSize = currentLocalOffset;
+    this->totalLocalVarSize = currentLocalOffset; // Will be <= 0
 
     // 2. Calculate total frame size.
     // Base size for $ra and $fp = 8 bytes.
-    // Add space for local variables.
-    // Add space for arguments passed on stack by this function to its callees (maxArgsPassed * 4) - 0 for now.
-    this->frameSize = -this->totalLocalVarSize + 8;  // + (maxArgsPassed * 4);
-    generator->emit("# Function " + (irFunction ? irFunction->name : "null_func") + ": totalLocalVarSize = " + std::to_string(this->totalLocalVarSize) + ", frameSize = " + std::to_string(this->frameSize));
-
-    // tempRegs initialization (already present in original code)
-    // tempRegs = {"$t0", "$t1", ..., "$t9"}; // Ensure this is initialized somewhere, e.g. in MipsCodeGenerator or here
+    // Additional space for any callee-saved registers we decide to use might be added later.
+    this->frameSize = -this->totalLocalVarSize + 8; // e.g. if totalLocalVarSize = -12 (3 vars/params), frameSize = 12 + 8 = 20
+    generator->emit("# Function " + irFunction->name + ": totalLocalVarSize = " + std::to_string(totalLocalVarSize) + ", frameSize = " + std::to_string(frameSize));
 }
 
 void MipsFunctionContext::generatePrologue() {
     if (!irFunction)
-        return;  // Should not happen if called correctly
+        return; 
 
     generator->emit("# Prologue for " + irFunction->name);
-    generator->emit("addiu $sp, $sp, -" + std::to_string(frameSize));  // Decrement SP to allocate frame
+    generator->emit("addiu $sp, $sp, -" + std::to_string(frameSize));
+    generator->emit("sw $ra, " + std::to_string(frameSize - 4) + "($sp)");
+    generator->emit("sw $fp, " + std::to_string(frameSize - 8) + "($sp)");
+    generator->emit("addiu $fp, $sp, " + std::to_string(frameSize - 8));
 
-    // Save $ra and $fp. $fp will point to the base of the allocated frame (new $sp).
-    // Locals are at 0($fp), 4($fp), ...
-    // Saved $fp is at totalLocalVarSize($fp)
-    // Saved $ra is at totalLocalVarSize + 4 ($fp)
-    // These offsets are relative to the NEW $sp before $fp is moved.
-    // So, if $fp = new $sp:
-    // totalLocalVarSize ($fp) is (frameSize - 8) from new $sp
-    // totalLocalVarSize + 4 ($fp) is (frameSize - 4) from new $sp
-    generator->emit("sw $ra, " + std::to_string(frameSize - 4) + "($sp)");  // Save $ra at top of frame
-    generator->emit("sw $fp, " + std::to_string(frameSize - 8) + "($sp)");  // Save old $fp below $ra
-
-    generator->emit("move $fp, $sp");  // $fp now points to the base of the current frame
-
-    // currentStackOffset could track distance from $fp if needed for other things,
-    // but for locals, varLocations stores their direct offset from $fp.
-    // For arguments passed in $a0-$a3 that need to be saved to stack:
-    // This is where you would sw $a0, offset($fp), etc. if you decide to save them.
-    // For testfile.txt, main() has no parameters.
+    // Store incoming parameters ($a0-$a3) to their assigned stack slots
+    for (size_t i = 0; i < paramNamesAndOffsetsForPrologue.size() && i < 4; ++i) {
+        const auto& param_info = paramNamesAndOffsetsForPrologue[i];
+        std::string arg_reg = "$a" + std::to_string(i);
+        generator->emit("sw " + arg_reg + ", " + std::to_string(param_info.second) + "($fp)");
+        generator->emit("# Stored " + arg_reg + " (param '" + param_info.first + "') to " + std::to_string(param_info.second) + "($fp)");
+    }
+    // TODO: Handle parameters passed on stack (5th and onwards)
 }
 
 void MipsFunctionContext::generateEpilogue() {
@@ -379,14 +491,16 @@ void MipsFunctionContext::generateEpilogue() {
     generator->emit("# Epilogue for " + irFunction->name);
     // $v0 should have the return value if any (set by visit(ReturnInst))
 
-    // Restore $ra and $fp from their saved locations relative to current $fp
-    // Using same logic as prologue for save locations:
-    generator->emit("lw $ra, " + std::to_string(frameSize - 4) + "($fp)");
-    generator->emit("lw $fp, " + std::to_string(frameSize - 8) + "($fp)");
+    // $fp currently points to where old $fp was saved.
+    // Old $ra is 4 bytes above that location (higher address).
+    generator->emit("lw $ra, 4($fp)");      // Restore $ra from [current $fp + 4]
+    generator->emit("lw $fp, 0($fp)");      // Restore old $fp from [current $fp + 0]
 
+    // Restore $sp to its value before this function's frame was allocated.
+    // The $sp was decremented by frameSize in the prologue.
     generator->emit("addiu $sp, $sp, " + std::to_string(frameSize));  // Deallocate frame
-    generator->emit("jr $ra");
-    generator->emit("nop");  // Branch delay slot
+    this->generator->emit("jr $ra");
+    this->generator->emit("nop");  // Branch delay slot
 }
 
 std::string MipsFunctionContext::ensureOperandInRegister(std::shared_ptr<IR::IROperand> operand) {

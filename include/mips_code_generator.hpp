@@ -189,5 +189,14 @@ class MipsFunctionContext {
 
     void generatePrologue();
     void generateEpilogue();
+
+    std::vector<std::pair<std::string, int>> paramNamesAndOffsetsForPrologue; // For storing $a0-$a3
+
+    const std::vector<std::string> CALLEE_SAVED_REGS = {
+        "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7"
+    };
+    const std::vector<std::string> CALLER_SAVED_TEMP_REGS = {
+        "$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7"
+    };
 };
 }  // namespace MipsCodeGenerator

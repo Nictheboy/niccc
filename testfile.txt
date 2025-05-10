@@ -1,5 +1,8 @@
 int a = 2, b;
-int func() { return 5; }
+int func1() { return 5; }
+int func2(int p, int q) {
+    return p + q * -q;
+}
 int main() {
     printf("hello, world!\n");
     printf("test integer print: %d\n", 1);
@@ -8,6 +11,8 @@ int main() {
     printf("test integer print: %d\n", b);
     const int c = 4;
     printf("test integer print: %d\n", c);
-    printf("test integer print: %d\n", func());
+    printf("test integer print: %d\n", func1());
+    const int d = func2(-4, -4) / 2 + 16;
+    printf("test integer print: %d\n", d);
     return 0;
 } 

@@ -51,6 +51,8 @@
         "set": "cpp",
         "sstream": "cpp",
         "stack": "cpp",
-        "streambuf": "cpp"
+        "streambuf": "cpp",
+        "list": "cpp",
+        "regex": "cpp"
     }
 }

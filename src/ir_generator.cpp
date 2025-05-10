@@ -252,33 +252,95 @@ std::shared_ptr<IR::IRVariable> IRGenerator::visitFuncFParam(PNNode node) {
 std::vector<std::shared_ptr<IR::IRVariable>> IRGenerator::visitFuncFParams(PNNode node) {
     std::vector<std::shared_ptr<IR::IRVariable>> ir_params;
 
-    // Assuming FuncFParams AST Node structure:
-    // Its children are multiple FuncFParam nodes, or it's empty if no parameters.
-    // E.g., FuncFParams -> [FuncFParam1, FuncFParam2, ...]
-
     if (!node || node->name != "FuncFParams") {
-        // It's possible for FuncFParams to be valid but have no children (no parameters)
-        // If the node itself is null or not named "FuncFParams", it might be an error
-        // or an optional node that's absent. For now, if it's not the expected node, return empty.
-        // Consider if an error should be thrown if !node and it was expected.
-        if (node) { /* TODO: Error handling for wrong node type */
+        if (node) {
+             std::cerr << "[IR_GEN_WARN] visitFuncFParams: Called with unexpected node type: " << node->name << std::endl;
+        } else {
+             std::cerr << "[IR_GEN_WARN] visitFuncFParams: Called with null node." << std::endl;
         }
-        return ir_params;  // Return empty vector
+        return ir_params; // Return empty if not FuncFParams or null
     }
 
-    for (const auto& child_node : node->children) {
-        auto func_fparam_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(child_node);
-        if (func_fparam_node) {
-            std::shared_ptr<IR::IRVariable> ir_param = this->visitFuncFParam(func_fparam_node);
-            if (ir_param) {
-                ir_params.push_back(ir_param);
+    std::cerr << "[IR_GEN] visitFuncFParams: Processing FuncFParams node with " << node->children.size() << " children." << std::endl;
+
+    // Based on grammar: FuncFParams -> FuncFParam FuncFParamsFollowing | epsilon
+    // Child 0: FuncFParam (if not epsilon)
+    // Child 1: FuncFParamsFollowing (if not epsilon)
+
+    if (node->children.empty()) {
+        std::cerr << "[IR_GEN] visitFuncFParams: No children, so no parameters (epsilon rule)." << std::endl;
+        return ir_params; // Epsilon case, no parameters
+    }
+
+    // Process the first FuncFParam (child 0)
+    auto first_fparam_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(0));
+    if (first_fparam_node && first_fparam_node->name == "FuncFParam") {
+        std::cerr << "[IR_GEN] visitFuncFParams: Visiting first FuncFParam." << std::endl;
+        std::shared_ptr<IR::IRVariable> ir_param = this->visitFuncFParam(first_fparam_node);
+        if (ir_param) {
+            ir_params.push_back(ir_param);
+            std::cerr << "[IR_GEN] visitFuncFParams: Added parameter: " << ir_param->name << std::endl;
+        } else {
+            std::cerr << "[IR_GEN_ERR] visitFuncFParams: visitFuncFParam returned null for the first parameter." << std::endl;
+        }
+    } else {
+        std::cerr << "[IR_GEN_ERR] visitFuncFParams: Expected first child to be FuncFParam, but found: " 
+                  << (first_fparam_node ? first_fparam_node->name : "null or not NonTerminalNode") << std::endl;
+        return ir_params; // Stop processing if structure is unexpected
+    }
+
+    // Process FuncFParamsFollowing (child 1, if it exists)
+    if (node->children.size() > 1) {
+        auto current_following_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(1));
+        while (current_following_node && current_following_node->name == "FuncFParamsFollowing" && !current_following_node->children.empty()) {
+            std::cerr << "[IR_GEN] visitFuncFParams: Processing FuncFParamsFollowing node with " << current_following_node->children.size() << " children." << std::endl;
+            // FuncFParamsFollowing -> COMMA FuncFParam FuncFParamsFollowing
+            // Child 0: COMMA (TerminalNode)
+            // Child 1: FuncFParam (NonTerminalNode)
+            // Child 2: FuncFParamsFollowing (NonTerminalNode, recursive)
+
+            // This following node must have at least COMMA and FuncFParam if it's not an epsilon itself.
+            // The grammar implies an empty FuncFParamsFollowing has 0 children.
+            // A non-empty one has 3 children: COMMA, FuncFParam, FuncFParamsFollowing_next.
+            if (current_following_node->children.size() < 2) { // Need at least COMMA and FuncFParam
+                std::cerr << "[IR_GEN_ERR] visitFuncFParams: FuncFParamsFollowing node has < 2 children. Expected COMMA and FuncFParam. Found: " << current_following_node->children.size() << std::endl;
+                break; 
+            }
+            
+            auto comma_node = std::dynamic_pointer_cast<AST::TerminalNode>(current_following_node->children.at(0));
+            auto next_fparam_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(current_following_node->children.at(1));
+
+            if (!comma_node || !comma_node->token || comma_node->token->matched != ",") {
+                std::cerr << "[IR_GEN_ERR] visitFuncFParams: Expected COMMA in FuncFParamsFollowing, but found: " 
+                          << (comma_node && comma_node->token ? comma_node->token->matched : "<not_a_comma_or_missing_token>") << std::endl;
+                break; 
+            }
+
+            if (next_fparam_node && next_fparam_node->name == "FuncFParam") {
+                 std::cerr << "[IR_GEN] visitFuncFParams: Visiting next FuncFParam from FuncFParamsFollowing." << std::endl;
+                std::shared_ptr<IR::IRVariable> ir_param = this->visitFuncFParam(next_fparam_node);
+                if (ir_param) {
+                    ir_params.push_back(ir_param);
+                    std::cerr << "[IR_GEN] visitFuncFParams: Added parameter: " << ir_param->name << std::endl;
+                } else {
+                     std::cerr << "[IR_GEN_ERR] visitFuncFParams: visitFuncFParam returned null for a subsequent parameter." << std::endl;
+                }
             } else {
-                // TODO: Error from visitFuncFParam, decide if to continue or propagate error
-                // throw std::runtime_error("Failed to process a function parameter.");
-                // For now, we skip the bad parameter and continue.
+                std::cerr << "[IR_GEN_ERR] visitFuncFParams: Expected FuncFParam as second child of FuncFParamsFollowing, but found: "
+                          << (next_fparam_node ? next_fparam_node->name : "null or not NonTerminalNode") << std::endl;
+                break; 
+            }
+
+            // Move to the next FuncFParamsFollowing node
+            if (current_following_node->children.size() > 2) {
+                current_following_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(current_following_node->children.at(2));
+            } else {
+                current_following_node = nullptr; // No more FuncFParamsFollowing in this chain
             }
         }
     }
+
+    std::cerr << "[IR_GEN] visitFuncFParams: Finished. Total parameters collected: " << ir_params.size() << std::endl;
     return ir_params;
 }
 
@@ -816,109 +878,218 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitUnaryExp(PNNode node) {
         return nullptr;
     }
 
-    // Try to identify a function call structure first, e.g., ID ( ARG_LIST )
-    // AST seems to be: UnaryExp(ID_Terminal, LPAREN_Terminal, FuncRParams_NonTerminal, RPAREN_Terminal)
-    // Or for no-arg call: UnaryExp(ID_Terminal, LPAREN_Terminal, FuncRParams_NonTerminal_empty, RPAREN_Terminal)
-    // The FuncRParams node itself might be optional or its children list empty if grammar is like that.
+    auto first_child_base = node->children.at(0);
 
-    if (node->children.size() >= 2) {  // Minimum for ID() assuming FuncRParams might be absent or children[1] is '('
-        auto first_child = node->children.at(0);
-        auto id_node = std::dynamic_pointer_cast<AST::TerminalNode>(first_child);
+    // Case 1: UnaryExp -> UnaryOp UnaryExp
+    if (auto op_wrapper_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child_base)) {
+        if (op_wrapper_node->name == "UnaryOp") {
+            std::cerr << "[IR_GEN] visitUnaryExp: Detected UnaryOp wrapper." << std::endl;
+            if (op_wrapper_node->children.empty() || node->children.size() < 2) {
+                std::cerr << "[IR_GEN_ERR] visitUnaryExp: Malformed UnaryOp UnaryExp structure. Need operator and operand expression." << std::endl;
+                return nullptr;
+            }
+            auto actual_op_token_node = std::dynamic_pointer_cast<AST::TerminalNode>(op_wrapper_node->children.at(0));
+            PNode operand_exp_ast_node = node->children.at(1);
 
-        // Check for function call pattern: ID ( ... )
-        // More robustly, check token types of children for ID, LPAREN, etc.
-        // For now, assume structure based on typical parsers: ID is first child, then '('
-        if (id_node && node->children.size() >= 3) {  // Need at least ID, '(', ')' for a basic call ID()
-                                                      // If FuncRParams is child 2: ID, '(', FuncRParams, ')' -> size 4
-                                                      // If FuncRParams is child 1 (after ID): ID, FuncRParams -> size 2, FuncRParams has '(',')'
-            // Let's assume based on the AST dump: UnaryExp("printf", "(", FuncRParams(...), ")")
-            // Child 0: "printf" (TerminalNode)
-            // Child 1: "(" (TerminalNode)
-            // Child 2: FuncRParams (NonTerminalNode)
-            // Child 3: ")" (TerminalNode)
+            if (!actual_op_token_node || !actual_op_token_node->token || !operand_exp_ast_node) {
+                std::cerr << "[IR_GEN_ERR] visitUnaryExp: Missing actual operator token or operand expression for UnaryOp." << std::endl;
+                return nullptr;
+            }
+            std::string op_token = actual_op_token_node->token->matched;
+            std::cerr << "[IR_GEN] visitUnaryExp: Operator is '" << op_token << "'. Processing operand UnaryExp." << std::endl;
 
-            if (node->children.size() == 4) {  // Expecting ID, LPAREN, FuncRParams, RPAREN
-                auto lparen_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(1));
-                auto func_rparams_node_base = node->children.at(2);  // This could be FuncRParams or ExpList etc.
-                auto rparen_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(3));
+            std::shared_ptr<IR::IROperand> operand_val = this->dispatchVisitExp(operand_exp_ast_node);
+            if (!operand_val) {
+                std::cerr << "[IR_GEN_ERR] visitUnaryExp: Failed to get operand for unary op '" << op_token << "'." << std::endl;
+                return nullptr;
+            }
 
-                // Basic structural check
-                if (id_node && lparen_node && lparen_node->token && lparen_node->token->matched == "(" &&
-                    rparen_node && rparen_node->token && rparen_node->token->matched == ")") {
-                    auto func_rparams_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(func_rparams_node_base);
-                    // func_rparams_node can be null if FuncRParams is optional and not present for a no-arg call,
-                    // OR if the grammar always includes a FuncRParams node which might be empty.
-                    // visitFunctionCall should handle a potentially null paramsNode.
-
-                    std::cerr << "[IR_GEN] visitUnaryExp: Detected function call for ID: " << id_node->token->matched << std::endl;
-                    return this->visitFunctionCall(id_node, func_rparams_node);
-                }
+            if (op_token == "+") {
+                std::cerr << "[IR_GEN] visitUnaryExp: Unary plus, returning operand directly." << std::endl;
+                return operand_val;
+            } else if (op_token == "-") {
+                std::cerr << "[IR_GEN] visitUnaryExp: Detected unary minus." << std::endl;
+                auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_uneg_");
+                auto const_zero = std::make_shared<IR::IRConstant>(0);
+                addInstruction(std::make_shared<IR::CallPureInst>("__builtin_sub_int", 
+                                                               std::vector<std::shared_ptr<IR::IROperand>>{const_zero, operand_val},
+                                                               std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
+                std::cerr << "[IR_GEN] visitUnaryExp: Generated CallPureInst for unary minus, result in " << result_temp->name << std::endl;
+                return result_temp;
+            } else if (op_token == "!") {
+                std::cerr << "[IR_GEN] visitUnaryExp: Detected logical NOT." << std::endl;
+                auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_lnot_"); 
+                auto const_zero = std::make_shared<IR::IRConstant>(0);
+                addInstruction(std::make_shared<IR::CallPureInst>("__builtin_eq_int", 
+                                                               std::vector<std::shared_ptr<IR::IROperand>>{operand_val, const_zero},
+                                                               std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
+                std::cerr << "[IR_GEN] visitUnaryExp: Generated CallPureInst for logical not, result in " << result_temp->name << std::endl;
+                return result_temp;
+            } else {
+                std::cerr << "[IR_GEN_ERR] visitUnaryExp: Unknown unary operator symbol: " << op_token << std::endl;
+                return nullptr;
             }
         }
     }
-
-    // Original logic for UnaryExp -> PrimaryExp or UnaryExp -> other single expression child
-    // This path is taken if it's not a function call structure like ID (PARAMS)
-    auto child_exp_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(0));
-    if (child_exp_node) {
-        if (child_exp_node->name == "PrimaryExp") {
+    
+    // Case 2: UnaryExp -> PrimaryExp 
+    // Case 3: UnaryExp -> ID ( FuncRParams ) (Function Call)
+    if (auto child_non_terminal = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child_base)) {
+        if (child_non_terminal->name == "PrimaryExp") {
             std::cerr << "[IR_GEN] visitUnaryExp: UnaryExp -> PrimaryExp. Visiting PrimaryExp." << std::endl;
-            return this->visitPrimaryExp(child_exp_node);
-        } else if (child_exp_node->name == "FunctionCall") {
-            // This case might be if your AST *already* has a dedicated "FunctionCall" non-terminal under UnaryExp
-            // The AST dump showed UnaryExp directly containing terminals for ID, '(', etc. not a FunctionCall node.
-            // If it *can* be a FunctionCall node, its structure would be: FunctionCall(ID, FuncRParams)
-            std::cerr << "[IR_GEN] visitUnaryExp: UnaryExp -> FunctionCall node. Visiting FunctionCall node." << std::endl;
-            if (child_exp_node->children.size() >= 1) {  // At least ID
-                auto func_id_node = std::dynamic_pointer_cast<AST::TerminalNode>(child_exp_node->children.at(0));
-                PNNode func_args_node = nullptr;
-                if (child_exp_node->children.size() > 1) {  // Optional args node
-                    func_args_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(child_exp_node->children.at(1));
+            return this->visitPrimaryExp(child_non_terminal);
+        }
+        std::cerr << "[IR_GEN_WARN] visitUnaryExp: UnaryExp -> NonTerminal('" << child_non_terminal->name << "') not explicitly handled as PrimaryExp or UnaryOp production. Attempting generic dispatch." << std::endl;
+        return this->dispatchVisitExp(child_non_terminal); 
+
+    } else if (auto id_terminal_for_func_call = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
+        if (node->children.size() >= 2) { 
+            auto lparen_candidate = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(1));
+            if (lparen_candidate && lparen_candidate->token && lparen_candidate->token->matched == "(") {
+                std::cerr << "[IR_GEN] visitUnaryExp: Detected function call pattern for ID: " << id_terminal_for_func_call->token->matched << std::endl;
+                PNNode func_rparams_node = nullptr;
+                if (node->children.size() > 2) { 
+                    auto rparams_candidate = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(2));
+                    if (rparams_candidate && rparams_candidate->name == "FuncRParams") {
+                         func_rparams_node = rparams_candidate;
+                    }
                 }
-                return this->visitFunctionCall(func_id_node, func_args_node);
+                return this->visitFunctionCall(id_terminal_for_func_call, func_rparams_node);
             }
         }
-        // Fallback for other non-terminal children of UnaryExp if not PrimaryExp or FunctionCall node
-        // This is a bit of a catch-all; ideally, UnaryExp productions are more specific.
-        std::cerr << "[IR_GEN] visitUnaryExp: UnaryExp -> NonTerminal(" << child_exp_node->name << "). Attempting generic dispatch." << std::endl;
-        return this->dispatchVisitExp(child_exp_node);  // Generic dispatch for other expression types under UnaryExp
+        std::cerr << "[IR_GEN_ERR] visitUnaryExp: Found Terminal '" << id_terminal_for_func_call->token->matched 
+                  << "' as first child of UnaryExp, but not a recognized function call pattern. " << std::endl;
+        return nullptr;
     }
 
-    std::cerr << "[IR_GEN_ERR] visitUnaryExp: Unhandled UnaryExp structure. First child is not a recognized NonTerminal for expression, nor does it match function call pattern. Child type: "
-              << (node->children.at(0) ? typeid(*node->children.at(0)).name() : "null_child_pointer") << std::endl;
+    // Corrected error logging for the final unhandled case in visitUnaryExp
+    std::string child_info_for_log = "<null_child_pointer_or_not_AST_Node>";
+    if (first_child_base) {
+        if (auto nt_child = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child_base)) {
+            child_info_for_log = "NonTerminalNode(name: " + nt_child->name + ")";
+        } else if (auto t_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
+            child_info_for_log = "TerminalNode(token: " + (t_child->token ? t_child->token->matched : "<no_token>") + ")";
+        } else {
+            child_info_for_log = "UnknownChildNodeType(typeid_name: " + std::string(typeid(*first_child_base).name()) + ")";
+        }
+    }
+    std::cerr << "[IR_GEN_ERR] visitUnaryExp: Unhandled UnaryExp structure. First child details: " << child_info_for_log << std::endl;
     return nullptr;
 }
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitMulExp(PNNode node) {
-    std::cerr << "[IR_GEN] visitMulExp() called for node: " << (node ? node->name : "<null_node>") << std::endl;
-    // Assuming MulExp -> UnaryExp ( ('*'|'/'|'%') UnaryExp )*
-    // For "0", it's MulExp -> UnaryExp.
-    if (!node || node->children.empty()) { /* TODO: Error */
+    std::cerr << "[IR_GEN] visitMulExp() called for node: " << (node ? node->name : "<null_node>")
+              << " with " << (node ? node->children.size() : 0) << " children." << std::endl;
+    if (!node || node->children.empty()) {
+        std::cerr << "[IR_GEN_ERR] visitMulExp: Null or empty MulExp node." << std::endl;
         return nullptr;
     }
-    // TODO: Implement operator handling for '*' '/' '%'.
-    // For now, just visit the first child (UnaryExp).
-    auto unary_exp_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(0));
-    if (unary_exp_node) {
-        return this->visitUnaryExp(unary_exp_node);
+
+    std::shared_ptr<IR::IROperand> current_lhs_operand = this->dispatchVisitExp(node->children.at(0));
+    if (!current_lhs_operand) {
+        std::cerr << "[IR_GEN_ERR] visitMulExp: Failed to get LHS operand for first UnaryExp." << std::endl;
+        return nullptr;
     }
-    return nullptr;
+    std::cerr << "[IR_GEN] visitMulExp: Initial LHS from first UnaryExp: " << current_lhs_operand->toString() << std::endl;
+
+    for (size_t i = 1; (i + 1) < node->children.size(); i += 2) {
+        auto op_terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(i));
+        auto rhs_ast_node = node->children.at(i + 1);
+
+        if (!op_terminal_node || !op_terminal_node->token || !rhs_ast_node) {
+            std::cerr << "[IR_GEN_ERR] visitMulExp: Malformed operator or RHS AST node in MulExp." << std::endl;
+            return nullptr;
+        }
+
+        std::string op_str = op_terminal_node->token->matched;
+        std::cerr << "[IR_GEN] visitMulExp: Processing operator '" << op_str << "'." << std::endl;
+
+        std::shared_ptr<IR::IROperand> rhs_operand = this->dispatchVisitExp(rhs_ast_node);
+        if (!rhs_operand) {
+            std::cerr << "[IR_GEN_ERR] visitMulExp: Failed to get RHS operand for operator " << op_str << std::endl;
+            return nullptr;
+        }
+        std::cerr << "[IR_GEN] visitMulExp: RHS for operator '" << op_str << "': " << rhs_operand->toString() << std::endl;
+
+        std::string pure_func_name;
+        if (op_str == "*") {
+            pure_func_name = "__builtin_mul_int";
+        } else if (op_str == "/") {
+            pure_func_name = "__builtin_div_int";
+        } else if (op_str == "%") {
+            pure_func_name = "__builtin_mod_int";
+        } else {
+            std::cerr << "[IR_GEN_ERR] visitMulExp: Unknown operator: " << op_str << std::endl;
+            return nullptr;
+        }
+
+        auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_muldiv_");
+        addInstruction(std::make_shared<IR::CallPureInst>(pure_func_name, 
+                                                       std::vector<std::shared_ptr<IR::IROperand>>{current_lhs_operand, rhs_operand},
+                                                       std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
+        current_lhs_operand = result_temp;
+        std::cerr << "[IR_GEN] visitMulExp: Generated CallPureInst for '" << op_str << "', result in " << result_temp->name << std::endl;
+    }
+
+    std::cerr << "[IR_GEN] visitMulExp: Final result: " << current_lhs_operand->toString() << std::endl;
+    return current_lhs_operand;
 }
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitAddExp(PNNode node) {
-    std::cerr << "[IR_GEN] visitAddExp() called for node: " << (node ? node->name : "<null_node>") << std::endl;
-    // Assuming AddExp -> MulExp ( ('+'|'-') MulExp )*
-    // For "0", it's AddExp -> MulExp.
-    if (!node || node->children.empty()) { /* TODO: Error */
+    std::cerr << "[IR_GEN] visitAddExp() called for node: " << (node ? node->name : "<null_node>")
+              << " with " << (node ? node->children.size() : 0) << " children." << std::endl;
+    // AST: AddExp -> MulExp ( ( '+' | '-' ) MulExp )*
+    // Children: [MulExp_0, Terminal_op_1, MulExp_1, Terminal_op_2, MulExp_2, ...]
+    if (!node || node->children.empty()) {
+        std::cerr << "[IR_GEN_ERR] visitAddExp: Null or empty AddExp node." << std::endl;
         return nullptr;
     }
-    // TODO: Implement operator handling for '+' '-'.
-    // For now, just visit the first child (MulExp).
-    auto mul_exp_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(0));
-    if (mul_exp_node) {
-        return this->visitMulExp(mul_exp_node);
+
+    std::shared_ptr<IR::IROperand> current_lhs_operand = this->dispatchVisitExp(node->children.at(0)); // Process first MulExp
+    if (!current_lhs_operand) {
+        std::cerr << "[IR_GEN_ERR] visitAddExp: Failed to get LHS operand for first MulExp." << std::endl;
+        return nullptr;
     }
-    return nullptr;
+    std::cerr << "[IR_GEN] visitAddExp: Initial LHS from first MulExp: " << current_lhs_operand->toString() << std::endl;
+
+    for (size_t i = 1; (i + 1) < node->children.size(); i += 2) {
+        auto op_terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(i));
+        auto rhs_ast_node = node->children.at(i + 1); // This is PNode
+
+        if (!op_terminal_node || !op_terminal_node->token || !rhs_ast_node) {
+            std::cerr << "[IR_GEN_ERR] visitAddExp: Malformed operator or RHS AST node in AddExp." << std::endl;
+            return nullptr;
+        }
+
+        std::string op_str = op_terminal_node->token->matched;
+        std::cerr << "[IR_GEN] visitAddExp: Processing operator '" << op_str << "'." << std::endl;
+
+        std::shared_ptr<IR::IROperand> rhs_operand = this->dispatchVisitExp(rhs_ast_node);
+        if (!rhs_operand) {
+            std::cerr << "[IR_GEN_ERR] visitAddExp: Failed to get RHS operand for operator " << op_str << std::endl;
+            return nullptr;
+        }
+        std::cerr << "[IR_GEN] visitAddExp: RHS for operator '" << op_str << "': " << rhs_operand->toString() << std::endl;
+
+        std::string pure_func_name;
+        if (op_str == "+") {
+            pure_func_name = "__builtin_add_int";
+        } else if (op_str == "-") {
+            pure_func_name = "__builtin_sub_int";
+        } else {
+            std::cerr << "[IR_GEN_ERR] visitAddExp: Unknown operator: " << op_str << std::endl;
+            return nullptr;
+        }
+
+        auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_addsub_");
+        addInstruction(std::make_shared<IR::CallPureInst>(pure_func_name, 
+                                                       std::vector<std::shared_ptr<IR::IROperand>>{current_lhs_operand, rhs_operand},
+                                                       std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
+        current_lhs_operand = result_temp;
+        std::cerr << "[IR_GEN] visitAddExp: Generated CallPureInst for '" << op_str << "', result in " << result_temp->name << std::endl;
+    }
+    std::cerr << "[IR_GEN] visitAddExp: Final result: " << current_lhs_operand->toString() << std::endl;
+    return current_lhs_operand;
 }
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitExp(PNNode node) {  // node is Exp, LOrExp, LAndExp, EqExp, RelExp, AddExp, or MulExp
@@ -946,10 +1117,28 @@ std::shared_ptr<IR::IROperand> IRGenerator::dispatchVisitExp(PNode node_base) {
 
     if (pn_node) {  // If cast to NonTerminalNode is successful
         std::cerr << "[IR_GEN] dispatchVisitExp: Dispatching for NonTerminalNode: " << pn_node->name << std::endl;
-        if (pn_node->name == "Exp" || pn_node->name == "LOrExp" || pn_node->name == "LAndExp" ||
-            pn_node->name == "EqExp" || pn_node->name == "RelExp" ||
-            pn_node->name == "AddExp" || pn_node->name == "MulExp") {  // Added common precedence ops
-            return this->visitExp(pn_node);                            // visitExp likely handles precedence by visiting its child
+        if (pn_node->name == "Exp") { // Exp itself is often a pass-through to higher precedence
+            return this->visitExp(pn_node);                            
+        } else if (pn_node->name == "LOrExp") { // Assuming LOrExp, LAndExp, EqExp, RelExp also have specific visitors or are handled by visitExp if they are simple pass-throughs
+            // If they have specific logic (e.g., short-circuiting), they need direct calls to their visitors.
+            // For now, assuming they might be like Exp or need specific handlers not yet fully implemented for complex logic.
+            // If their structure is always Child_0 op Child_1 ... then they need their own visitXXX method called here.
+            // Based on typical expression grammars, these often reduce to their first child if no operator is present at their level.
+            // Let's assume for now, like Exp, if they are just precedence wrappers without an op at their level, visitExp is fine.
+            // However, if they *do* have operators, visitExp will incorrectly take only the first child.
+            // THIS NEEDS VERIFICATION based on grammar and how visitLOrExp etc. are (or should be) implemented.
+            // For now, to fix AddExp/MulExp specifically:
+            return this->visitExp(pn_node); // Placeholder - this might be wrong for LOrExp etc. if they have operators.
+        } else if (pn_node->name == "LAndExp") {
+            return this->visitExp(pn_node); // Placeholder
+        } else if (pn_node->name == "EqExp") {
+            return this->visitExp(pn_node); // Placeholder
+        } else if (pn_node->name == "RelExp") {
+            return this->visitExp(pn_node); // Placeholder
+        } else if (pn_node->name == "AddExp") {
+            return this->visitAddExp(pn_node); // CORRECTED: Call visitAddExp directly
+        } else if (pn_node->name == "MulExp") {
+            return this->visitMulExp(pn_node); // CORRECTED: Call visitMulExp directly
         } else if (pn_node->name == "UnaryExp") {
             return this->visitUnaryExp(pn_node);
         } else if (pn_node->name == "PrimaryExp") {
