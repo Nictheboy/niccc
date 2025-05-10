@@ -116,6 +116,7 @@ class MipsCodeGenerator {
     // --- 函数处理 ---
     void generateFunction(std::shared_ptr<IR::NormalIRFunction> normalFunc);
     void generatePrintfImplementation();
+    void generateGetintImplementation();
 
     // --- 指令翻译 ---
     // 每个NormalIRFunction的指令都有一个对应的visit方法

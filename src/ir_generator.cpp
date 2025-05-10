@@ -1267,6 +1267,14 @@ std::shared_ptr<IR::IRProgram> IRGenerator::generate(PNode rootAstNode) {
     this->program->addNormalFunction(printf_func_decl);
     std::cerr << "[IR_GEN] Pre-defined library function: printf" << std::endl;
 
+    // Pre-define getint function
+    // getint takes no parameters and returns an int.
+    auto int_type = std::make_shared<IR::SimpleIRType>(IR::SimpleTypeKind::INTEGER);
+    std::vector<std::shared_ptr<IR::IRVariable>> getint_params; // No parameters
+    auto getint_func_decl = std::make_shared<IR::NormalIRFunction>("getint", getint_params, int_type);
+    this->program->addNormalFunction(getint_func_decl);
+    std::cerr << "[IR_GEN] Pre-defined library function: getint" << std::endl;
+
     if (rootAstNode) {
         this->dispatchVisit(rootAstNode);
     }

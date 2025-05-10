@@ -108,13 +108,16 @@ void MipsCodeGenerator::generateProgram(std::shared_ptr<IR::IRProgram> irProgram
     // Generate printf implementation
     generatePrintfImplementation();
 
+    // Generate getint implementation
+    generateGetintImplementation();
+
     // Generate all other functions from the IR program
     if (irProgram) {
         for (const auto& pair : irProgram->normalFunctions) {
             std::shared_ptr<IR::NormalIRFunction> func = pair.second;
             // if (func->name != "_start") { // _start is special, already generated
-            // Skip generating generic function code for "printf" as it has a custom implementation
-            if (func->name == "printf") {
+            // Skip generating generic function code for "printf" and "getint" as they have custom implementations
+            if (func->name == "printf" || func->name == "getint") {
                 continue;
             }
             generateFunction(func);
@@ -718,6 +721,33 @@ void MipsCodeGenerator::generatePrintfImplementation() {
     emit("addi $sp, $sp, 20");
     emit("jr $ra");
     emit("nop");  // Branch delay slot
+}
+
+// Private method to be added to MipsCodeGenerator for getint
+void MipsCodeGenerator::generateGetintImplementation() {
+    emitLabel("getint");
+
+    // Standard function prologue for getint
+    // For getint, it's very simple: no locals, no parameters to save.
+    // Only need to save $ra if we were to make calls, but we only do a syscall.
+    // However, to be safe and consistent with a general function structure:
+    emit("addi $sp, $sp, -8");  // Space for $ra, $fp (2 words)
+    emit("sw $ra, 4($sp)");
+    emit("sw $fp, 0($sp)");
+    emit("move $fp, $sp");
+
+    // Syscall for read_integer (code 5)
+    // The integer read is returned in $v0
+    emit("li $v0, 5");
+    emit("syscall");
+
+    // Standard function epilogue
+    // Result is already in $v0, no need to move it.
+    emit("lw $fp, 0($sp)");
+    emit("lw $ra, 4($sp)");
+    emit("addi $sp, $sp, 8");
+    emit("jr $ra");
+    emit("nop"); // Branch delay slot
 }
 
 }  // namespace MipsCodeGenerator
