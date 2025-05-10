@@ -1,8 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include "ast.hpp"
-#include "common.hpp"
+#include "ir_generator.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
 
@@ -48,8 +47,12 @@ int main(int argc, char* argv[]) {
         Parser::Parser parser(grammarRules, tokenDefinitions, scanContext);
         std::shared_ptr<AST::Node> astRoot = parser.parse(tokens);
         std::cout << "Parsing successful!" << std::endl;
-        std::cout << "\nAST:" << std::endl;
-        std::cout << astRoot->toString() << std::endl;
+        // std::cout << "\nAST:" << std::endl;
+        // std::cout << astRoot->toString() << std::endl;
+        IRGenerator::IRGenerator irGenerator;
+        auto irProgram = irGenerator.generate(astRoot);
+        std::cout << "IR Program:" << std::endl;
+        std::cout << irProgram->toString() << std::endl;
     } catch (const CompilerError& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

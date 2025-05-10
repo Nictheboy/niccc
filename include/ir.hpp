@@ -116,13 +116,16 @@ class IROperand {
 };
 
 class IRConstant : public IROperand {
-};
-class IRVariable : public IROperand {
    public:
-    std::string name;
-    IRVariable(std::string n, std::shared_ptr<IRType> t)
-        : IROperand(t), name(std::move(n)) {}
-    std::string toString() const override { return name + ":" + (type ? type->toString() : "untyped"); }
+    // For now, only integer constants. Could be a variant for other types.
+    int value;
+
+    IRConstant(int val)
+        : IROperand(std::make_shared<SimpleIRType>(SimpleTypeKind::INTEGER)), value(val) {}
+
+    std::string toString() const override {
+        return std::to_string(value);
+    }
 };
 
 // Represents a named variable, parameter, or temporary result
