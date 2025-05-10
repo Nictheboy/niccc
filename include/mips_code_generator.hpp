@@ -49,6 +49,7 @@ class MipsCodeGenerator {
     void visit(std::shared_ptr<IR::JumpInst> inst);
     void visit(std::shared_ptr<IR::CondJumpInst> inst);
     void visit(std::shared_ptr<IR::CallNormalInst> inst);
+    void visit(std::shared_ptr<IR::AssignInst> inst);
 
    private:
     std::ostream& output;  // 汇编代码输出流
@@ -121,7 +122,7 @@ class MipsFunctionContext {
 
     // MIPS寄存器列表 (可以根据需要调整)
     const std::vector<std::string> argumentRegs = {"$a0", "$a1", "$a2", "$a3"};
-    const std::vector<std::string> tempRegs = {"$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7", "$t8", "$t9"};
+    static const std::vector<std::string> tempRegs;
     const std::vector<std::string> savedRegs = {"$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7"};
 
     void allocateParameters();

@@ -137,9 +137,12 @@ class IRConstant : public IROperand {
 class IRVariable : public IROperand {
    public:
     std::string name;  // e.g., "%t1", "param_x", "local_var_y"
+    bool is_global; // Optional: could be useful
+    bool is_const;  // To help with assignments
+    std::shared_ptr<IRConstant> global_initializer_constant; // For global inits
 
-    IRVariable(std::string n, std::shared_ptr<IRType> t)
-        : IROperand(t), name(std::move(n)) {}
+    IRVariable(std::string n, std::shared_ptr<IRType> t, bool is_global = false, bool is_const = false)
+        : IROperand(t), name(std::move(n)), is_global(is_global), is_const(is_const), global_initializer_constant(nullptr) {}
 
     std::string toString() const override {
         return name + ":" + (type ? type->toString() : "untyped");
@@ -380,6 +383,19 @@ class ReturnInst : public IRInstruction {
     }
 };
 
+class AssignInst : public IRInstruction {
+public:
+    std::shared_ptr<IRVariable> dest;    // The variable being assigned to
+    std::shared_ptr<IROperand> source; // The value or variable being assigned from
+
+    AssignInst(std::shared_ptr<IRVariable> d, std::shared_ptr<IROperand> s)
+        : dest(std::move(d)), source(std::move(s)) {}
+
+    std::string toString() const override {
+        return "ASSIGN " + (dest ? dest->name : "null_dest") + " = " + (source ? source->toString() : "null_src");
+    }
+};
+
 //-----------------------------------------------------------------------------
 // 4. IRFunction (Base, Pure, Normal) - PureIRFunction 结构大改
 //-----------------------------------------------------------------------------
@@ -532,6 +548,10 @@ class IRProgram {
     std::map<std::string, std::string> stringLiterals;  // label -> processed_string
     int stringLiteralCounter = 0;
 
+    std::map<std::string, std::shared_ptr<IRVariable>> globalVariables; // Name to IRVariable
+
+    IRProgram() = default;
+
     std::string addStringLiteral(const std::string& content) {
         // Check if identical string already exists to reuse label
         for (const auto& pair : stringLiterals) {
@@ -556,8 +576,32 @@ class IRProgram {
         normalFunctions[func->name] = func;
     }
 
+    void addGlobalVariable(const std::shared_ptr<IRVariable>& var) {
+        if (var) {
+            globalVariables[var->name] = var;
+            var->is_global = true; // Mark it as global
+        }
+    }
+
     std::string toString() const {
         std::string s = "IR PROGRAM:\n\n";
+        s += "--- GLOBAL VARIABLES ---\n";
+        if (globalVariables.empty()) {
+            s += "(none)\n";
+        } else {
+            for (const auto& pair : globalVariables) {
+                s += "  VAR " + pair.second->toString();
+                if (pair.second->is_const) {
+                    s += " (const)";
+                }
+                if (pair.second->global_initializer_constant) {
+                    s += " = " + pair.second->global_initializer_constant->toString();
+                }
+                s += "\n";
+            }
+        }
+        s += "\n";
+
         s += "--- PURE FUNCTIONS ---\n";
         for (const auto& pair : pureFunctions) {
             s += pair.second->toString() + "\n";

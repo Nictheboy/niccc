@@ -5,6 +5,7 @@
 #include <stdexcept>  // For std::runtime_error
 #include <string>
 #include <vector>
+#include <optional>
 #include "ast.hpp"           // 你的 AST 头文件
 #include "ir.hpp"            // 你的 IR 头文件
 #include "symbol_table.hpp"  // 符号表头文件 (下面会给出概念)
@@ -42,8 +43,8 @@ class IRGenerator {
     // --- AST 节点访问者方法 (返回IROperand主要用于表达式，其他返回void) ---
     // T visit(PNode node); // 泛型或重载版本
     // 这里使用具体的返回类型或void，并依赖dynamic_cast进行分发
-    void dispatchVisit(PNode node);                               // 用于无返回值的访问
-    std::shared_ptr<IR::IROperand> dispatchVisitExp(PNode node);  // 用于有返回值的表达式访问
+    void dispatchVisit(PNode node_base);                               // 用于无返回值的访问
+    std::shared_ptr<IR::IROperand> dispatchVisitExp(PNode node_base);  // 用于有返回值的表达式访问
 
     // 全局结构
     void visitCompUnit(PNNode node);
@@ -90,6 +91,10 @@ class IRGenerator {
 
     // 从AST节点获取操作数 (通常是标识符或字面量)
     std::shared_ptr<IR::IROperand> getOperandFromPrimary(PNNode primaryNode);
+
+    // Declaration visitors
+    void visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> base_ir_type, bool is_const);
+    void visitConstDef(PNNode node);
 };
 
 };  // namespace IRGenerator

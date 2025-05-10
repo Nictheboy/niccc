@@ -1,5 +1,11 @@
+int a = 2, b;
 int main() {
     printf("hello, world!\n");
     printf("test integer print: %d\n", 1);
+    printf("test integer print: %d\n", a);
+    b = 3;
+    printf("test integer print: %d\n", b);
+    const int c = 4;
+    printf("test integer print: %d\n", c);
     return 0;
 } 
