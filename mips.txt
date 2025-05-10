@@ -68,12 +68,29 @@ printf_end:
 	addi $sp, $sp, 20
 	jr $ra
 	nop
-	# Function main: totalLocalVarSize = -4, frameSize = 4
+	# Function func: totalLocalVarSize = 0, frameSize = 8
+func:
+	# Prologue for func
+	addiu $sp, $sp, -8
+	sw $ra, 4($sp)
+	sw $fp, 0($sp)
+	move $fp, $sp
+	# Ensuring operand 5 is in a register
+	# Reserved temporary register $t0
+	li $t0, 5
+	move $v0, $t0
+	# Epilogue for func
+	lw $ra, 4($fp)
+	lw $fp, 0($fp)
+	addiu $sp, $sp, 8
+	jr $ra
+	nop
+	# Function main: totalLocalVarSize = -8, frameSize = 16
 main:
 	# Prologue for main
-	addiu $sp, $sp, -4
-	sw $ra, 0($sp)
-	sw $fp, -4($sp)
+	addiu $sp, $sp, -16
+	sw $ra, 12($sp)
+	sw $fp, 8($sp)
 	move $fp, $sp
 	# --- Calling function: printf ---
 	# Ensuring operand label _S0 is in a register
@@ -148,8 +165,8 @@ main:
 	# Ensuring operand 4 is in a register
 	# Reserved temporary register $t0
 	li $t0, 4
-	sw $t0, -4($fp)
-	# Stored to local c at -4($fp)
+	sw $t0, -8($fp)
+	# Stored to local c at -8($fp)
 	# Released temporary register $t0
 	# --- Calling function: printf ---
 	# Ensuring operand label _S1 is in a register
@@ -159,8 +176,30 @@ main:
 	move $a0, $t0
 	# Ensuring operand c:INTEGER is in a register
 	# Reserved temporary register $t1
+	lw $t1, -8($fp)
+	# Loaded local var c from -8($fp) into $t1
+	move $a1, $t1
+	jal printf
+	nop
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# --- End of call to printf ---
+	# --- Calling function: func ---
+	jal func
+	nop
+	sw $v0, -4($fp)
+	# Variable %tmp_call_func_0 (result of func) stored from $v0
+	# --- End of call to func ---
+	# --- Calling function: printf ---
+	# Ensuring operand label _S1 is in a register
+	# Reserved temporary register $t0
+	la $t0, _S1
+	# Loaded address of label _S1 into $t0
+	move $a0, $t0
+	# Ensuring operand %tmp_call_func_0:INTEGER is in a register
+	# Reserved temporary register $t1
 	lw $t1, -4($fp)
-	# Loaded local var c from -4($fp) into $t1
+	# Loaded local var %tmp_call_func_0 from -4($fp) into $t1
 	move $a1, $t1
 	jal printf
 	nop
@@ -172,9 +211,9 @@ main:
 	li $t0, 0
 	move $v0, $t0
 	# Epilogue for main
-	lw $ra, 0($fp)
-	lw $fp, -4($fp)
-	addiu $sp, $sp, 4
+	lw $ra, 12($fp)
+	lw $fp, 8($fp)
+	addiu $sp, $sp, 16
 	jr $ra
 	nop
 

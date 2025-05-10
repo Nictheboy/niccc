@@ -313,7 +313,7 @@ void IRGenerator::visitBlockItem(PNNode blockItemNode) {
         std::cerr << "[IR_GEN_ERR] visitBlockItem: Unexpected node type '" << actual_statement_or_decl_node->name << "' inside BlockItem." << std::endl;
         // Fallback or error: For robustness, you might still call visitStmt or log a more severe error.
         // For now, just logging. If it's an expression or other statement-like non-terminal, visitStmt might be a guess.
-        // this->visitStmt(actual_statement_or_decl_node); 
+        // this->visitStmt(actual_statement_or_decl_node);
     }
 }
 
@@ -400,7 +400,7 @@ void IRGenerator::visitReturnStmt(PNNode node) {
         if (!exp_ast_node_p) {
             std::cerr << "[IR_GEN_ERR] visitReturnStmt: Exp AST node is null." << std::endl;
             // Potentially add a void return or error recovery
-            auto void_return_inst = std::make_shared<IR::ReturnInst>(nullptr); // Explicitly pass nullptr
+            auto void_return_inst = std::make_shared<IR::ReturnInst>(nullptr);  // Explicitly pass nullptr
             addInstruction(void_return_inst);
             return;
         }
@@ -415,7 +415,7 @@ void IRGenerator::visitReturnStmt(PNNode node) {
             // For now, let's assume if an Exp was provided, a value was expected. This might be a point for stricter error handling.
             // Consider adding a void return instruction if the function is void, or error if not.
             // Forcing a void return for now if expression evaluation failed to produce an operand.
-            auto error_return_inst = std::make_shared<IR::ReturnInst>(nullptr); // Explicitly pass nullptr
+            auto error_return_inst = std::make_shared<IR::ReturnInst>(nullptr);  // Explicitly pass nullptr
             addInstruction(error_return_inst);
             return;
         }
@@ -433,11 +433,14 @@ void IRGenerator::visitReturnStmt(PNNode node) {
     // if (return_value_operand.has_value() && is_func_void) {
     if (return_value_operand && is_func_void) {
         std::cerr << "[IR_GEN_WARN] visitReturnStmt: Value returned from a void function. Ignoring return value." << std::endl;
-        return_value_operand = nullptr; // Discard the value for a void function
-    // } else if (!return_value_operand.has_value() && !is_func_void) {
+        return_value_operand = nullptr;  // Discard the value for a void function
+        // } else if (!return_value_operand.has_value() && !is_func_void) {
     } else if (!return_value_operand && !is_func_void) {
         std::cerr << "[IR_GEN_ERR] visitReturnStmt: No value returned from a non-void function (";
-        if(func_ret_type) std::cerr << func_ret_type->toString(); else std::cerr << "unknown_type";
+        if (func_ret_type)
+            std::cerr << func_ret_type->toString();
+        else
+            std::cerr << "unknown_type";
         std::cerr << "). This might be an error." << std::endl;
         // This is problematic. A non-void function must return a value.
         // Depending on error strategy, either create a dummy error value or stop.
@@ -467,7 +470,7 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
     if (auto terminal_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
         std::cerr << "[IR_GEN] visitStmt: First child is terminal: " << terminal_child->token->matched << std::endl;
         if (terminal_child->token->matched == "return") {
-            this->visitReturnStmt(stmtNode); // visitReturnStmt itself takes the Stmt node
+            this->visitReturnStmt(stmtNode);  // visitReturnStmt itself takes the Stmt node
         }
         // ... other keyword-based statements like "if", "while", etc.
         else {
@@ -486,7 +489,7 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
             if (assign_op_node && assign_op_node->token && assign_op_node->token->matched == "=") {
                 // This is an assignment statement
                 std::cerr << "[IR_GEN] visitStmt: Detected assignment statement." << std::endl;
-                PNNode lval_node = non_terminal_child; // This is children.at(0)
+                PNNode lval_node = non_terminal_child;  // This is children.at(0)
                 PNode exp_node = stmtNode->children.at(2);
 
                 std::shared_ptr<IR::IROperand> lval_operand = this->visitLVal(lval_node);
@@ -500,9 +503,9 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
                         // Check if LVal is const
                         SymbolInfo symbol_info = symbolTable.lookupSymbol(dest_variable->name);
                         if (symbol_info.is_const) {
-                             std::cerr << "[IR_GEN_ERR] visitStmt: Cannot assign to const variable '" << dest_variable->name << "'." << std::endl;
-                             // Optionally throw an error or stop compilation.
-                             return;
+                            std::cerr << "[IR_GEN_ERR] visitStmt: Cannot assign to const variable '" << dest_variable->name << "'." << std::endl;
+                            // Optionally throw an error or stop compilation.
+                            return;
                         }
 
                         auto assign_inst = std::make_shared<IR::AssignInst>(dest_variable, rhs_operand);
@@ -514,7 +517,7 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
                 } else {
                     std::cerr << "[IR_GEN_ERR] visitStmt: Failed to generate IR for LVal or RHS of assignment." << std::endl;
                 }
-                return; // Handled assignment
+                return;  // Handled assignment
             }
         }
 
@@ -523,13 +526,13 @@ void IRGenerator::visitStmt(PNNode stmtNode) {
         // (Covers function calls like printf(); or simple expressions evaluated for side effects)
         // Check if non_terminal_child->name is one of your expression types
         if (non_terminal_child->name == "Exp" ||
-            non_terminal_child->name == "LOrExp" || // ... and other expression non-terminals from your dispatchVisitExp
-            non_terminal_child->name == "UnaryExp" || // UnaryExp can be a function call
+            non_terminal_child->name == "LOrExp" ||    // ... and other expression non-terminals from your dispatchVisitExp
+            non_terminal_child->name == "UnaryExp" ||  // UnaryExp can be a function call
             non_terminal_child->name == "PrimaryExp"
             /* etc. */
-            ) {
+        ) {
             std::cerr << "[IR_GEN] visitStmt: Visiting expression child " << non_terminal_child->name << " for side effects (ExpStmt)." << std::endl;
-            this->dispatchVisitExp(non_terminal_child); // Visit the expression, result is discarded
+            this->dispatchVisitExp(non_terminal_child);  // Visit the expression, result is discarded
         } else {
             std::cerr << "[IR_GEN] visitStmt: Unhandled non-terminal statement type: " << non_terminal_child->name << std::endl;
         }
@@ -672,6 +675,12 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitFunctionCall(PTNode idNode, PNN
             std::string temp_name = "%tmp_call_" + func_name + "_" + std::to_string(tempVarCounter++);
             result_destination = createNamedVar(temp_name, expected_call_ret_type);
             std::cerr << "[IR_GEN] Created temp var '" << temp_name << "' for non-void normal call result." << std::endl;
+            if (this->currentNormalFunction && result_destination) {        // Ensure context and variable exist
+                this->currentNormalFunction->addLocal(result_destination);  // Add to locals
+                // Also add to symbol table so it can be found if needed by other IR stages, though for temps it's less critical
+                // symbolTable.addSymbol(result_destination->name, result_destination, result_destination->type, false);
+                std::cerr << "[IR_GEN] Added temp var '" << temp_name << "' to locals of function " << this->currentNormalFunction->name << std::endl;
+            }
         } else {
             std::cerr << "[IR_GEN] Normal function '" << func_name << "' is void or has null ret type. No result destination needed." << std::endl;
         }
@@ -687,7 +696,7 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitFunctionCall(PTNode idNode, PNN
         // A CallPureInst should be generated instead if we are in a NormalIRFunction body.
         // If this function call is itself within a PureIRFunction, then a PureInternalCallInst is needed.
         // This indicates a need to differentiate call sites or how pure functions are invoked from expression contexts.
-        return nullptr; // Placeholder: Error or specific handling for pure func in expr
+        return nullptr;  // Placeholder: Error or specific handling for pure func in expr
     }
 
     // The result_destination (std::shared_ptr<IR::IRVariable>) is passed to CallNormalInst
@@ -701,11 +710,11 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitFunctionCall(PTNode idNode, PNN
     // if (result_destination.has_value()) {
     //     return result_destination.value(); // This would be std::shared_ptr<IR::IRVariable>
     // }
-    if (result_destination) { // If a temp var was created (i.e., function is not void)
+    if (result_destination) {  // If a temp var was created (i.e., function is not void)
         return result_destination;
     }
 
-    return nullptr; // For void function calls or errors
+    return nullptr;  // For void function calls or errors
 }
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitNumber(PTNode node) {
@@ -747,7 +756,7 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitPrimaryExp(PNNode node) {
         // Case 2: LVal (variable usage)
         else if (non_terminal_exp_child->name == "LVal") {
             std::cerr << "[IR_GEN] visitPrimaryExp: Visiting LVal." << std::endl;
-            return this->visitLVal(non_terminal_exp_child); // visitLVal returns IRVariable
+            return this->visitLVal(non_terminal_exp_child);  // visitLVal returns IRVariable
         }
         // Case 3 (part 2): Number wrapped in a NonTerminalNode (e.g., PrimaryExp -> NumberNode -> TerminalToken)
         else if (non_terminal_exp_child->name == "Number" && !non_terminal_exp_child->children.empty()) {
@@ -775,7 +784,7 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitPrimaryExp(PNNode node) {
             }
             // Number
             else if (isdigit(matched_text[0]) || (matched_text.length() > 1 && matched_text[0] == '-' && isdigit(matched_text[1]))) {
-                 std::cerr << "[IR_GEN] visitPrimaryExp: Visiting Number (direct terminal)." << std::endl;
+                std::cerr << "[IR_GEN] visitPrimaryExp: Visiting Number (direct terminal)." << std::endl;
                 return this->visitNumber(terminal_node);
             }
         }
@@ -1063,7 +1072,7 @@ std::shared_ptr<IR::IRProgram> IRGenerator::generate(PNode rootAstNode) {
     auto placeholder_ptr_type = std::make_shared<IR::SimpleIRType>(IR::SimpleTypeKind::INTEGER);
     auto format_param_var = std::make_shared<IR::IRVariable>("%format_str_param", placeholder_ptr_type);
     std::vector<std::shared_ptr<IR::IRVariable>> printf_params;
-    printf_params.push_back(format_param_var); 
+    printf_params.push_back(format_param_var);
 
     auto printf_func_decl = std::make_shared<IR::NormalIRFunction>("printf", printf_params, void_type);
     this->program->addNormalFunction(printf_func_decl);
@@ -1095,10 +1104,10 @@ void IRGenerator::dispatchVisit(PNode node_base) {
         this->visitFuncDef(node);
     } else if (node->name == "CompUnit") {
         this->visitCompUnit(node);
-    } else if (node->name == "VarDef") { // For global VarDefs
-        this->visitVarDef(node); // Uncommented and will call the VarDef visitor
-    } else if (node->name == "ConstDef") { // Added for global ConstDefs
-        this->visitConstDef(node); // Will call the ConstDef visitor
+    } else if (node->name == "VarDef") {    // For global VarDefs
+        this->visitVarDef(node);            // Uncommented and will call the VarDef visitor
+    } else if (node->name == "ConstDef") {  // Added for global ConstDefs
+        this->visitConstDef(node);          // Will call the ConstDef visitor
     } else {
         std::cerr << "[IR_GEN] dispatchVisit: Unknown node type for general dispatch: " << node->name << std::endl;
     }
@@ -1150,7 +1159,8 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
 
     for (const auto& decl_child_base : decl_list_node->children) {
         auto decl_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(decl_child_base);
-        if (!decl_node) continue;
+        if (!decl_node)
+            continue;
 
         // Modified to accept "VarDefItem" as it's collected by visitVarDef/visitConstDef
         if (decl_node->name == "VarDecl" || decl_node->name == "ConstDecl" || decl_node->name == "VarDefItem") {
@@ -1170,7 +1180,7 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
             std::cerr << "[IR_GEN] visitDecl: Processing variable: " << var_name << " from node named " << decl_node->name << std::endl;
 
             auto ir_variable = std::make_shared<IR::IRVariable>(var_name, base_ir_type);
-            ir_variable->is_const = is_const; // Explicitly set based on parameter
+            ir_variable->is_const = is_const;  // Explicitly set based on parameter
 
             if (!symbolTable.addSymbol(var_name, ir_variable, base_ir_type, is_const)) {
                 std::cerr << "[IR_GEN_ERR] visitDecl: Failed to add symbol '" << var_name << "' to symbol table." << std::endl;
@@ -1179,17 +1189,17 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
             std::cerr << "[IR_GEN] visitDecl: Added '" << var_name << "' to symbol table. is_const: " << is_const << std::endl;
 
             bool is_global = (this->currentNormalFunction == nullptr);
-            ir_variable->is_global = is_global; // Mark global status on IRVariable
+            ir_variable->is_global = is_global;  // Mark global status on IRVariable
 
-            if (!is_global) { // Local variable
-                if (this->currentNormalFunction) { // Ensure current function context exists
+            if (!is_global) {                       // Local variable
+                if (this->currentNormalFunction) {  // Ensure current function context exists
                     this->currentNormalFunction->addLocal(ir_variable);
                     std::cerr << "[IR_GEN] visitDecl: Added '" << var_name << "' to local variables of function " << this->currentNormalFunction->name << std::endl;
                 } else {
-                     std::cerr << "[IR_GEN_ERR] visitDecl: currentNormalFunction is null for a non-global variable '" << var_name << "'." << std::endl;
-                     continue; // Cannot add local var without function context
+                    std::cerr << "[IR_GEN_ERR] visitDecl: currentNormalFunction is null for a non-global variable '" << var_name << "'." << std::endl;
+                    continue;  // Cannot add local var without function context
                 }
-            } else { // Global variable
+            } else {  // Global variable
                 if (this->program) {
                     this->program->addGlobalVariable(ir_variable);
                     std::cerr << "[IR_GEN] visitDecl: Added '" << var_name << "' to global variables." << std::endl;
@@ -1204,15 +1214,15 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
             // We need to find the "=" and then the InitVal node.
             // Let's search for "=" token among children of decl_node (VarDefItem).
             PNode initializer_node = nullptr;
-            for (size_t i = 1; i < decl_node->children.size(); ++i) { // Start search after IDENT
+            for (size_t i = 1; i < decl_node->children.size(); ++i) {  // Start search after IDENT
                 auto child = decl_node->children[i];
                 if (auto terminal_child = std::dynamic_pointer_cast<AST::TerminalNode>(child)) {
                     if (terminal_child->token && terminal_child->token->matched == "=") {
                         if (i + 1 < decl_node->children.size()) {
                             // The node after "=" should be InitVal (which itself contains an Exp)
-                            auto init_val_wrapper_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(decl_node->children[i+1]);
-                            if (init_val_wrapper_node && init_val_wrapper_node->name == "InitVal" && !init_val_wrapper_node->children.empty()){
-                                initializer_node = init_val_wrapper_node->children.at(0); // Get the Exp node from InitVal
+                            auto init_val_wrapper_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(decl_node->children[i + 1]);
+                            if (init_val_wrapper_node && init_val_wrapper_node->name == "InitVal" && !init_val_wrapper_node->children.empty()) {
+                                initializer_node = init_val_wrapper_node->children.at(0);  // Get the Exp node from InitVal
                                 std::string init_node_name_for_log = "<unknown_init_node_type>";
                                 if (auto nt_init_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(initializer_node)) {
                                     init_node_name_for_log = nt_init_node->name;
@@ -1224,7 +1234,7 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
                                 std::cerr << "[IR_GEN_ERR] visitDecl: Expected InitVal node after \'=\' for '" << var_name << "', found different structure." << std::endl;
                             }
                         }
-                        break; 
+                        break;
                     }
                 }
             }
@@ -1239,8 +1249,8 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
                         } else {
                             std::cerr << "[IR_GEN_ERR] visitDecl: Non-constant initializer for global variable '" << var_name << "' is not supported for direct data segment init." << std::endl;
                         }
-                    } else { // Local variable initializer
-                        if (this->currentNormalFunction){ // Ensure context for adding instruction
+                    } else {                                // Local variable initializer
+                        if (this->currentNormalFunction) {  // Ensure context for adding instruction
                             auto assign_inst = std::make_shared<IR::AssignInst>(ir_variable, init_val_operand);
                             this->addInstruction(assign_inst);
                             std::cerr << "[IR_GEN] visitDecl: Added AssignInst for local initializer of '" << var_name << "'." << std::endl;
@@ -1254,14 +1264,14 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
             } else if (is_const) {
                 std::cerr << "[IR_GEN_ERR] visitDecl: ConstDecl for '" << var_name << "' is missing an initializer." << std::endl;
             }
-        // Removed recursive call: else if (decl_node->name == decl_list_node->name) { visitDecl(decl_node, base_ir_type, is_const); }
-        // The new structure with visitVarDef/visitConstDef and collectVarDefItems should handle iteration correctly.
+            // Removed recursive call: else if (decl_node->name == decl_list_node->name) { visitDecl(decl_node, base_ir_type, is_const); }
+            // The new structure with visitVarDef/visitConstDef and collectVarDefItems should handle iteration correctly.
         }
     }
 }
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitLVal(PNNode node, bool forAssignment /*= false*/) {
-    std::cerr << "[IR_GEN] visitLVal() called for node: " << (node ? node->name : "null") 
+    std::cerr << "[IR_GEN] visitLVal() called for node: " << (node ? node->name : "null")
               << ", forAssignment: " << forAssignment << std::endl;
     if (!node || node->name != "LVal" || node->children.empty()) {
         std::cerr << "[IR_GEN_ERR] visitLVal: Invalid LVal node." << std::endl;
@@ -1279,15 +1289,15 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitLVal(PNNode node, bool forAssig
 
     SymbolInfo symbol_info = symbolTable.lookupSymbol(var_name);
 
-    if (!symbol_info.variable) { 
+    if (!symbol_info.variable) {
         std::cerr << "[IR_GEN_ERR] visitLVal: Variable '" << var_name << "' not found in symbol table." << std::endl;
         return nullptr;
     }
 
     std::cerr << "[IR_GEN] visitLVal: Found variable '" << var_name << "' in symbol table. Type: "
               << (symbol_info.ir_type ? symbol_info.ir_type->toString() : "unknown_type") << std::endl;
-    
-    // The forAssignment flag could be used here later if needed, e.g., to return an address operand 
+
+    // The forAssignment flag could be used here later if needed, e.g., to return an address operand
     // for writes vs. a value operand for reads, but for now, returning the IRVariable itself is fine
     // as the AssignInst handles the store, and expressions will load the value.
 
@@ -1296,19 +1306,20 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitLVal(PNNode node, bool forAssig
 
 // Helper function to recursively collect VarDefItem nodes
 void collectVarDefItems(IRGenerator::PNNode node, std::vector<IRGenerator::PNNode>& items) {
-    if (!node) return;
+    if (!node)
+        return;
 
     if (node->name == "VarDefItem") {
         items.push_back(node);
     } else if (node->name == "VarDefItemsFollowing") {
         // Structure: VarDefItemsFollowing -> "," VarDefItem VarDefItemsFollowing
         // Or VarDefItemsFollowing -> epsilon (empty children)
-        if (node->children.size() >= 2) { // Expect at least COMMA and VarDefItem
+        if (node->children.size() >= 2) {  // Expect at least COMMA and VarDefItem
             auto item_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(1));
             if (item_node && item_node->name == "VarDefItem") {
                 items.push_back(item_node);
             }
-            if (node->children.size() >= 3) { // Check for nested VarDefItemsFollowing
+            if (node->children.size() >= 3) {  // Check for nested VarDefItemsFollowing
                 auto following_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node->children.at(2));
                 collectVarDefItems(following_node, items);
             }
@@ -1316,7 +1327,6 @@ void collectVarDefItems(IRGenerator::PNNode node, std::vector<IRGenerator::PNNod
     }
     // Add other relevant checks if AST structure for lists can vary
 }
-
 
 void IRGenerator::visitVarDef(PNNode var_def_node) {
     std::cerr << "[IR_GEN] visitVarDef() called for node: " << (var_def_node ? var_def_node->name : "null") << std::endl;
@@ -1329,7 +1339,7 @@ void IRGenerator::visitVarDef(PNNode var_def_node) {
     // OR: "const" Type VarDefItem ... (for const, if parser emits VarDef for consts)
 
     PNNode type_node = nullptr;
-    size_t items_start_index = 0; // Index of the first VarDefItem
+    size_t items_start_index = 0;  // Index of the first VarDefItem
     bool is_const_decl = false;
 
     auto first_child = var_def_node->children.at(0);
@@ -1341,7 +1351,7 @@ void IRGenerator::visitVarDef(PNNode var_def_node) {
                 return;
             }
             type_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(var_def_node->children.at(1));
-            items_start_index = 2; // Type is child 1, first item is child 2
+            items_start_index = 2;  // Type is child 1, first item is child 2
             std::cerr << "[IR_GEN] visitVarDef: Detected 'const' prefix. is_const_decl = true." << std::endl;
         } else {
             // This case should ideally not happen if VarDef starts with a terminal that isn't 'const'.
@@ -1352,7 +1362,7 @@ void IRGenerator::visitVarDef(PNNode var_def_node) {
     } else if (auto non_terminal_type = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child)) {
         // Assumed to be Type node directly for non-const VarDef
         type_node = non_terminal_type;
-        items_start_index = 1; // Type is child 0, first item is child 1
+        items_start_index = 1;  // Type is child 0, first item is child 1
         is_const_decl = false;
         std::cerr << "[IR_GEN] visitVarDef: No 'const' prefix, assuming non-const. is_const_decl = false." << std::endl;
     } else {
@@ -1374,12 +1384,12 @@ void IRGenerator::visitVarDef(PNNode var_def_node) {
     std::vector<PNNode> actual_decl_items;
     if (var_def_node->children.size() > items_start_index) {
         auto first_item_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(var_def_node->children.at(items_start_index));
-        collectVarDefItems(first_item_node, actual_decl_items); // Collect first VarDefItem
+        collectVarDefItems(first_item_node, actual_decl_items);  // Collect first VarDefItem
 
         if (var_def_node->children.size() > items_start_index + 1) {
             auto following_items_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(var_def_node->children.at(items_start_index + 1));
             if (following_items_node && following_items_node->name == "VarDefItemsFollowing") {
-                 collectVarDefItems(following_items_node, actual_decl_items); // Collect subsequent items
+                collectVarDefItems(following_items_node, actual_decl_items);  // Collect subsequent items
             }
         }
     }
@@ -1414,14 +1424,14 @@ void IRGenerator::visitVarDef(PNNode var_def_node) {
         // I will adjust `visitDecl` to accept `VarDefItem` as well. (This edit will be next).
         synthetic_decl_list_node->children.push_back(item);
     }
-    
+
     std::cerr << "[IR_GEN] visitVarDef: Calling visitDecl with " << actual_decl_items.size() << " items. is_const_decl: " << is_const_decl << std::endl;
     this->visitDecl(synthetic_decl_list_node, base_ir_type, is_const_decl);
 }
 
 void IRGenerator::visitConstDef(PNNode const_def_node) {
     std::cerr << "[IR_GEN] visitConstDef() called for node: " << (const_def_node ? const_def_node->name : "null") << std::endl;
-    
+
     // AST structure for "const int c = 4;" based on previous logs when it was misparsed by visitStmt:
     // VarDef("const", Type("int"), VarDefItem("c",...), VarDefItemsFollowing(), ";")
     // If the parser creates a "ConstDef" node, its structure might be:
@@ -1430,7 +1440,7 @@ void IRGenerator::visitConstDef(PNNode const_def_node) {
 
     // Let's assume const_def_node->name is "ConstDef" or "VarDef" (if parser uses VarDef for consts).
     // The first child could be "const" terminal, or Type node.
-    
+
     if (!const_def_node || const_def_node->children.empty()) {
         std::cerr << "[IR_GEN_ERR] visitConstDef: Invalid ConstDef node." << std::endl;
         return;
@@ -1444,14 +1454,14 @@ void IRGenerator::visitConstDef(PNNode const_def_node) {
         if (terminal_const->token && terminal_const->token->matched == "const") {
             // Structure: "const", Type, VarDefItem/ConstDefItem, ...
             if (const_def_node->children.size() < 2) {
-                 std::cerr << "[IR_GEN_ERR] visitConstDef: Node starts with \'const\' but not enough children for Type." << std::endl;
-                 return;
+                std::cerr << "[IR_GEN_ERR] visitConstDef: Node starts with \'const\' but not enough children for Type." << std::endl;
+                return;
             }
             type_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(const_def_node->children.at(1));
             items_start_index = 2;
         } else {
-             std::cerr << "[IR_GEN_ERR] visitConstDef: First child is terminal but not \'const\'." << std::endl;
-             return; // Or assume type_node is child 0 if ConstDef node implies constness
+            std::cerr << "[IR_GEN_ERR] visitConstDef: First child is terminal but not \'const\'." << std::endl;
+            return;  // Or assume type_node is child 0 if ConstDef node implies constness
         }
     } else if (auto non_terminal_type = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child)) {
         // Structure: Type, VarDefItem/ConstDefItem, ... (assuming ConstDef node name itself implies constness)
@@ -1461,7 +1471,7 @@ void IRGenerator::visitConstDef(PNNode const_def_node) {
         std::cerr << "[IR_GEN_ERR] visitConstDef: Cannot determine Type node from ConstDef structure." << std::endl;
         return;
     }
-    
+
     if (!type_node) {
         std::cerr << "[IR_GEN_ERR] visitConstDef: Type node is null." << std::endl;
         return;
@@ -1476,12 +1486,12 @@ void IRGenerator::visitConstDef(PNNode const_def_node) {
     std::vector<PNNode> actual_decl_items;
     if (const_def_node->children.size() > items_start_index) {
         auto first_item_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(const_def_node->children.at(items_start_index));
-        collectVarDefItems(first_item_node, actual_decl_items); // Collect first VarDefItem/ConstDefItem
+        collectVarDefItems(first_item_node, actual_decl_items);  // Collect first VarDefItem/ConstDefItem
 
         if (const_def_node->children.size() > items_start_index + 1) {
             auto following_items_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(const_def_node->children.at(items_start_index + 1));
-            if (following_items_node && following_items_node->name == "VarDefItemsFollowing") { // Or ConstDefItemsFollowing
-                 collectVarDefItems(following_items_node, actual_decl_items); // Collect subsequent items
+            if (following_items_node && following_items_node->name == "VarDefItemsFollowing") {  // Or ConstDefItemsFollowing
+                collectVarDefItems(following_items_node, actual_decl_items);                     // Collect subsequent items
             }
         }
     }
@@ -1492,7 +1502,7 @@ void IRGenerator::visitConstDef(PNNode const_def_node) {
     }
 
     auto synthetic_decl_list_node = std::make_shared<AST::NonTerminalNode>("SyntheticConstDeclList");
-     for (const auto& item : actual_decl_items) {
+    for (const auto& item : actual_decl_items) {
         // Assuming `visitDecl` will be updated to handle "VarDefItem" as if it were "ConstDecl"
         // when `is_const` is true.
         synthetic_decl_list_node->children.push_back(item);
