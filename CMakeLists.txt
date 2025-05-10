@@ -51,3 +51,12 @@ if(NOT TARGET niccc)
     target_link_libraries(niccc libniccc)
     install(TARGETS niccc)
 endif()
+
+if(NOT TARGET niccc-source-printer)
+    set(SOURCE_PRINTER_SOURCES
+        src/source_printer.cpp
+    )
+    add_executable(niccc-source-printer ${SOURCE_PRINTER_SOURCES})
+    target_link_libraries(niccc-source-printer libniccc)
+    install(TARGETS niccc-source-printer)
+endif()
