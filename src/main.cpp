@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include "ir_generator.hpp"
+#include "mips_code_generator.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
 
@@ -49,10 +50,17 @@ int main(int argc, char* argv[]) {
         std::cout << "Parsing successful!" << std::endl;
         std::cout << "\nAST:" << std::endl;
         std::cout << astRoot->toString() << std::endl;
+
         IRGenerator::IRGenerator irGenerator;
         auto irProgram = irGenerator.generate(astRoot);
         std::cout << "IR Program:" << std::endl;
         std::cout << irProgram->toString() << std::endl;
+
+        std::ofstream outputFile("mips.txt");
+        std::cout << "Generating MIPS code..." << std::endl;
+        MipsCodeGenerator::MipsCodeGenerator mipsCodeGenerator(outputFile);
+        mipsCodeGenerator.generateProgram(irProgram);
+        std::cout << "MIPS code generated successfully." << std::endl;
     } catch (const CompilerError& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;
