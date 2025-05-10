@@ -380,63 +380,74 @@ void IRGenerator::visitBlock(PNNode node, bool createNewScope) {
 }
 
 void IRGenerator::visitReturnStmt(PNNode node) {
-    std::cerr << "[IR_GEN] visitReturnStmt() called for node: " << (node ? node->name : "null") << std::endl;
-
-    std::optional<std::shared_ptr<IR::IROperand>> return_value_operand = std::nullopt;
-
-    // AST for return statement: Stmt -> "return" Exp ";"
-    // Or for void return: Stmt -> "return" ";"
-    if (!node || node->name != "Stmt" || node->children.empty()) {  // Ensure node is a Stmt node
-        std::cerr << "[IR_GEN] visitReturnStmt: Node is null, not a Stmt, or has no children. Name: "
-                  << (node ? node->name : "null") << std::endl;
-        return;  // Not a valid Stmt for return processing
-    }
-
-    // Child 0 is expected to be "return" keyword.
-    auto return_keyword_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(0));
-    if (!return_keyword_node || !return_keyword_node->token || return_keyword_node->token->matched != "return") {
-        std::cerr << "[IR_GEN] visitReturnStmt: Stmt node is not a return statement. First child token: "
-                  << (return_keyword_node && return_keyword_node->token ? return_keyword_node->token->matched : "<missing>")
-                  << std::endl;
-        // This function should only be called for actual return statements.
-        // If called incorrectly, do not proceed with generating a return instruction.
+    std::cerr << "[IR_GEN] visitReturnStmt() called for node: " << (node ? node->name : "null") << " with " << (node ? node->children.size() : 0) << " children." << std::endl;
+    if (!currentNormalFunction) {
+        std::cerr << "[IR_GEN_ERR] No current function to return from." << std::endl;
         return;
     }
 
-    if (node->children.size() > 1) {  // Check if there's more than just the "return" keyword
-        auto second_child = node->children.at(1);
-        // Check if the second child is not the semicolon, implying it's an expression.
-        bool is_expression_present = true;
-        if (auto terminal_node = std::dynamic_pointer_cast<AST::TerminalNode>(second_child)) {
-            if (terminal_node->token && terminal_node->token->matched == ";") {
-                is_expression_present = false;  // It's "return ;"
-            }
-        }
+    // std::optional<std::shared_ptr<IR::IROperand>> return_value_operand = std::nullopt;
+    std::shared_ptr<IR::IROperand> return_value_operand = nullptr;
 
-        if (is_expression_present) {
-            // Ensure we are not trying to visit a semicolon as an expression
-            if (node->children.size() >= 2) {  // "return" Exp ...
-                // The expression is the second child.
-                PNode exp_ast_node = node->children.at(1);
-                std::cerr << "[IR_GEN] visitReturnStmt: Visiting expression for return." << std::endl;
-                return_value_operand = this->dispatchVisitExp(exp_ast_node);
-                if (!return_value_operand.has_value() || !return_value_operand.value()) {
-                    std::cerr << "[IR_GEN] visitReturnStmt: Failed to generate IR for return expression." << std::endl;
-                }
-            } else {
-                std::cerr << "[IR_GEN] visitReturnStmt: Return statement with expression expected at least 2 children (return, Exp), found " << node->children.size() << std::endl;
-            }
-        } else {
-            std::cerr << "[IR_GEN] visitReturnStmt: Detected void return (return ;)." << std::endl;
+    // ReturnStmt -> 'return' Exp ';'
+    // ReturnStmt -> 'return' ';'
+    // Child 0 is 'return' token
+    // Child 1 (if exists) is Exp
+    // Child 2 (or 1 if no Exp) is ';'
+
+    if (node->children.size() > 2) {  // Has Exp (e.g., 'return', Exp, ';')
+        auto exp_ast_node_p = node->children.at(1);
+        if (!exp_ast_node_p) {
+            std::cerr << "[IR_GEN_ERR] visitReturnStmt: Exp AST node is null." << std::endl;
+            // Potentially add a void return or error recovery
+            auto void_return_inst = std::make_shared<IR::ReturnInst>(nullptr); // Explicitly pass nullptr
+            addInstruction(void_return_inst);
+            return;
         }
+        std::cerr << "[IR_GEN] visitReturnStmt: Visiting Exp node for return value." << std::endl;
+        return_value_operand = this->dispatchVisitExp(exp_ast_node_p);
+
+        // if (!return_value_operand.has_value() || !return_value_operand.value()) {
+        if (!return_value_operand) {
+            std::cerr << "[IR_GEN_ERR] visitReturnStmt: dispatchVisitExp for return value resulted in null or empty optional." << std::endl;
+            // This case might mean an error in expression evaluation or a void-returning expression used as value.
+            // Depending on language semantics, this could be an error or imply a default/void return.
+            // For now, let's assume if an Exp was provided, a value was expected. This might be a point for stricter error handling.
+            // Consider adding a void return instruction if the function is void, or error if not.
+            // Forcing a void return for now if expression evaluation failed to produce an operand.
+            auto error_return_inst = std::make_shared<IR::ReturnInst>(nullptr); // Explicitly pass nullptr
+            addInstruction(error_return_inst);
+            return;
+        }
+        std::cerr << "[IR_GEN] visitReturnStmt: Return value operand: " << return_value_operand->toString() << std::endl;
+
     } else {
-        // This case (e.g. only "return" child) might be an incomplete AST or a grammar that allows "return" without ";"
-        std::cerr << "[IR_GEN] visitReturnStmt: Return statement has only one child (the 'return' keyword). Assuming void return or expecting semicolon to be handled by parser." << std::endl;
+        std::cerr << "[IR_GEN] visitReturnStmt: No Exp node, void return." << std::endl;
+        // No expression, so it's a void return. return_value_operand remains std::nullopt (now nullptr)
+    }
+
+    // Check if the function's return type is void and if we have a value
+    auto func_ret_type = currentNormalFunction->returnType;
+    bool is_func_void = (std::dynamic_pointer_cast<IR::VoidIRType>(func_ret_type) != nullptr);
+
+    // if (return_value_operand.has_value() && is_func_void) {
+    if (return_value_operand && is_func_void) {
+        std::cerr << "[IR_GEN_WARN] visitReturnStmt: Value returned from a void function. Ignoring return value." << std::endl;
+        return_value_operand = nullptr; // Discard the value for a void function
+    // } else if (!return_value_operand.has_value() && !is_func_void) {
+    } else if (!return_value_operand && !is_func_void) {
+        std::cerr << "[IR_GEN_ERR] visitReturnStmt: No value returned from a non-void function (";
+        if(func_ret_type) std::cerr << func_ret_type->toString(); else std::cerr << "unknown_type";
+        std::cerr << "). This might be an error." << std::endl;
+        // This is problematic. A non-void function must return a value.
+        // Depending on error strategy, either create a dummy error value or stop.
+        // For now, we'll still create a ReturnInst, which will take nullptr if return_value_operand is still null.
+        // The IR verifier or later stages should catch this inconsistency if the function expects a value.
     }
 
     auto actual_return_inst = std::make_shared<IR::ReturnInst>(return_value_operand);
-    this->addInstruction(actual_return_inst);
-    std::cerr << "[IR_GEN] visitReturnStmt: Added RETURN instruction." << std::endl;
+    addInstruction(actual_return_inst);
+    std::cerr << "[IR_GEN] visitReturnStmt: ReturnInst added to function '" << currentNormalFunction->name << "'." << std::endl;
 }
 
 void IRGenerator::visitStmt(PNNode stmtNode) {
@@ -627,64 +638,74 @@ std::vector<std::shared_ptr<IR::IROperand>> IRGenerator::visitFuncRParams(PNNode
 }
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitFunctionCall(PTNode idNode, PNNode paramsNode) {
-    // idNode: TerminalNode for the function identifier.
-    // paramsNode: NonTerminalNode for actual parameters ("FuncRParams" or similar), can be null.
-
-    if (!this->currentNormalFunction) {
-        // TODO: Error or special handling if function call happens outside a normal function context.
-        // (This might be valid for global initializers in some languages, but not for simple C-like calls)
-        return nullptr;
-    }
-    if (!idNode || !idNode->token) {
-        // TODO: Error: invalid function identifier node
+    std::cerr << "[IR_GEN] visitFunctionCall for function '" << idNode->token->matched << "'" << std::endl;
+    if (!currentNormalFunction) {
+        std::cerr << "[IR_GEN_ERR] No current function context for function call." << std::endl;
         return nullptr;
     }
 
-    std::string callee_name = idNode->token->matched;
+    std::string func_name = idNode->token->matched;
+    std::vector<std::shared_ptr<IR::IROperand>> ir_args = visitFuncRParams(paramsNode);
 
-    // 1. Visit actual parameters to get their IR operands
-    std::vector<std::shared_ptr<IR::IROperand>> ir_arguments = this->visitFuncRParams(paramsNode);
+    // Before creating CallNormalInst, check if the function exists in the program
+    if (!this->program || (!this->program->normalFunctions.count(func_name) && !this->program->pureFunctions.count(func_name))) {
+        std::cerr << "[IR_GEN_ERR] Undeclared function called: " << func_name << std::endl;
+        // Potentially return a special error operand or handle as per language spec (e.g., implicit declaration)
+        // For now, returning nullptr, which will likely lead to issues downstream if not handled.
+        return nullptr;
+    }
 
-    // 2. Determine if function is void or returns a value.
-    // This requires looking up the function signature from the symbol table
-    // or having conventions for external functions.
-    // For now, let's assume we need to look it up. If it's an external function like "printf",
-    // we might have a predefined signature or assume it based on usage.
+    // Determine if it's a call to a normal or pure function and get its return type / result destination handling
+    // std::optional<std::shared_ptr<IR::IRVariable>> result_destination = std::nullopt;
+    std::shared_ptr<IR::IRVariable> result_destination = nullptr;
+    std::shared_ptr<IR::IRType> expected_call_ret_type = nullptr;
+    bool is_normal_call = false;
 
-    // Placeholder: How to get return type?
-    // SymbolEntry* func_symbol = symbolTable.lookupSymbolEntry(callee_name);
-    // std::shared_ptr<IR::IRType> return_type = nullptr;
-    // if (func_symbol && func_symbol->type) { // Assuming type stores FunctionType or similar
-    //    auto func_type = std::dynamic_pointer_cast<IR::FunctionType>(func_symbol->type); // Need IR::FunctionType
-    //    if (func_type) return_type = func_type->returnType;
+    if (this->program->normalFunctions.count(func_name)) {
+        is_normal_call = true;
+        auto target_func = this->program->normalFunctions.at(func_name);
+        expected_call_ret_type = target_func->returnType;
+        std::cerr << "[IR_GEN] Function '" << func_name << "' is a Normal Function. Return type: " << (expected_call_ret_type ? expected_call_ret_type->toString() : "null_type") << std::endl;
+
+        // If the normal function is not void, create a temporary variable for the result.
+        if (std::dynamic_pointer_cast<IR::VoidIRType>(expected_call_ret_type) == nullptr && expected_call_ret_type != nullptr) {
+            std::string temp_name = "%tmp_call_" + func_name + "_" + std::to_string(tempVarCounter++);
+            result_destination = createNamedVar(temp_name, expected_call_ret_type);
+            std::cerr << "[IR_GEN] Created temp var '" << temp_name << "' for non-void normal call result." << std::endl;
+        } else {
+            std::cerr << "[IR_GEN] Normal function '" << func_name << "' is void or has null ret type. No result destination needed." << std::endl;
+        }
+    } else if (this->program->pureFunctions.count(func_name)) {
+        // This is a CallPureInst situation, which has a different structure for results.
+        // visitFunctionCall is primarily for expressions, which expect a single IROperand result (or void).
+        // Pure functions can have multiple results. If a pure function is called in an expression context,
+        // it should ideally return a single value or be an error if it returns multiple/zero and one is expected.
+        std::cerr << "[IR_GEN_ERR] Calling a Pure Function ('" << func_name << "') in a context that expects a Normal Function Call. This is not yet fully supported here." << std::endl;
+        // How to handle this? If pure functions are callable like normal ones in expressions, you need a convention.
+        // e.g. only pure functions with exactly one output can be used here.
+        // For now, this path will likely lead to an error or misbehavior because CallNormalInst is used below.
+        // A CallPureInst should be generated instead if we are in a NormalIRFunction body.
+        // If this function call is itself within a PureIRFunction, then a PureInternalCallInst is needed.
+        // This indicates a need to differentiate call sites or how pure functions are invoked from expression contexts.
+        return nullptr; // Placeholder: Error or specific handling for pure func in expr
+    }
+
+    // The result_destination (std::shared_ptr<IR::IRVariable>) is passed to CallNormalInst
+    // The constructor CallNormalInst(..., std::shared_ptr<IRVariable> resDest) will set hasResultDestination.
+    auto call_inst = std::make_shared<IR::CallNormalInst>(func_name, ir_args, result_destination);
+    addInstruction(call_inst);
+    std::cerr << "[IR_GEN] CallNormalInst generated for '" << func_name << "'." << std::endl;
+
+    // The value of the function call expression is the temporary variable that stores the result.
+    // If the function is void (result_destination is nullopt/nullptr), then the call expr has no value (returns nullptr operand).
+    // if (result_destination.has_value()) {
+    //     return result_destination.value(); // This would be std::shared_ptr<IR::IRVariable>
     // }
-    // For a "print" function, it's likely void. For others, you'd need this info.
-    // Let's assume for now we might need a result variable if it's not known to be void.
-
-    bool is_known_void_function = (callee_name == "print" || callee_name == "printf");  // Simplification
-
-    std::optional<std::shared_ptr<IR::IRVariable>> result_destination = std::nullopt;
-    std::shared_ptr<IR::IRVariable> result_operand_for_caller = nullptr;
-
-    // If the function is not known to be void, create a temporary to store its result.
-    // (A more sophisticated approach would get the actual return type)
-    if (!is_known_void_function) {
-        // Assuming it returns an INTEGER if not void. This is a big simplification.
-        // You need the actual return type of the function here.
-        // For now, let's create a temp integer var if we expect a result.
-        // The decision to create this should ideally depend on whether the call's result is USED.
-        auto temp_var = this->createTempSimpleVar(IR::SimpleTypeKind::INTEGER);
-        result_destination = temp_var;
-        result_operand_for_caller = temp_var;
+    if (result_destination) { // If a temp var was created (i.e., function is not void)
+        return result_destination;
     }
 
-    // 3. Create CallNormalInst (assuming all calls are to normal functions for now)
-    //    If you have pure functions, you'd need logic to choose CallPureInst.
-    auto call_inst = std::make_shared<IR::CallNormalInst>(callee_name, ir_arguments, result_destination);
-    this->addInstruction(call_inst);
-
-    // 4. Return the variable where the result is stored (if any)
-    return result_operand_for_caller;  // This will be nullptr if function is void or result not captured
+    return nullptr; // For void function calls or errors
 }
 
 std::shared_ptr<IR::IROperand> IRGenerator::visitNumber(PTNode node) {
@@ -1034,6 +1055,20 @@ std::shared_ptr<IR::IRProgram> IRGenerator::generate(PNode rootAstNode) {
     this->program = std::make_shared<IR::IRProgram>();
     this->tempVarCounter = 0;
     this->labelCounter = 0;
+
+    // Pre-define library functions like printf
+    auto void_type = std::make_shared<IR::VoidIRType>();
+    // For printf's first parameter (format string), use a placeholder type.
+    // Addresses/pointers are often treated as integers.
+    auto placeholder_ptr_type = std::make_shared<IR::SimpleIRType>(IR::SimpleTypeKind::INTEGER);
+    auto format_param_var = std::make_shared<IR::IRVariable>("%format_str_param", placeholder_ptr_type);
+    std::vector<std::shared_ptr<IR::IRVariable>> printf_params;
+    printf_params.push_back(format_param_var); 
+
+    auto printf_func_decl = std::make_shared<IR::NormalIRFunction>("printf", printf_params, void_type);
+    this->program->addNormalFunction(printf_func_decl);
+    std::cerr << "[IR_GEN] Pre-defined library function: printf" << std::endl;
+
     if (rootAstNode) {
         this->dispatchVisit(rootAstNode);
     }

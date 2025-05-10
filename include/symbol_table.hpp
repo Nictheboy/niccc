@@ -68,7 +68,8 @@ class SymbolTable {
 
     void enterScope(bool isFunctionEntry = false) {
         Scope* parentScope = currentScope; // If currentScope is null, it's the first (global) scope
-        auto newScope = std::make_unique<Scope>(parentScope, isFunctionEntry);
+        // auto newScope = std::make_unique<Scope>(parentScope, isFunctionEntry);
+        std::unique_ptr<Scope> newScope(new Scope(parentScope, isFunctionEntry));
         currentScope = newScope.get();
         scopesStack.push_back(std::move(newScope));
     }

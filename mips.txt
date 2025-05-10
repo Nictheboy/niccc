@@ -68,13 +68,12 @@ printf_end:
 	addi $sp, $sp, 20
 	jr $ra
 	nop
-	# Local var c assigned to stack offset 0($fp)
-	# Function main: totalLocalVarSize = 4, frameSize = 12
+	# Function main: totalLocalVarSize = -4, frameSize = 4
 main:
 	# Prologue for main
-	addiu $sp, $sp, -12
-	sw $ra, 8($sp)
-	sw $fp, 4($sp)
+	addiu $sp, $sp, -4
+	sw $ra, 0($sp)
+	sw $fp, -4($sp)
 	move $fp, $sp
 	# --- Calling function: printf ---
 	# Ensuring operand label _S0 is in a register
@@ -149,8 +148,8 @@ main:
 	# Ensuring operand 4 is in a register
 	# Reserved temporary register $t0
 	li $t0, 4
-	sw $t0, 0($fp)
-	# Stored to local c at 0($fp)
+	sw $t0, -4($fp)
+	# Stored to local c at -4($fp)
 	# Released temporary register $t0
 	# --- Calling function: printf ---
 	# Ensuring operand label _S1 is in a register
@@ -160,8 +159,8 @@ main:
 	move $a0, $t0
 	# Ensuring operand c:INTEGER is in a register
 	# Reserved temporary register $t1
-	lw $t1, 0($fp)
-	# Loaded local var c from 0($fp) into $t1
+	lw $t1, -4($fp)
+	# Loaded local var c from -4($fp) into $t1
 	move $a1, $t1
 	jal printf
 	nop
@@ -173,9 +172,9 @@ main:
 	li $t0, 0
 	move $v0, $t0
 	# Epilogue for main
-	lw $ra, 8($fp)
-	lw $fp, 4($fp)
-	addiu $sp, $sp, 12
+	lw $ra, 0($fp)
+	lw $fp, -4($fp)
+	addiu $sp, $sp, 4
 	jr $ra
 	nop
 

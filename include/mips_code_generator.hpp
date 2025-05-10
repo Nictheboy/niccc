@@ -5,7 +5,7 @@
 #include <memory>
 #include <set>
 #include <string>
-#include <variant>  // Added for std::variant in MipsFunctionContext
+// #include <variant>  // Removed for C++11
 #include <vector>
 #include "ir.hpp"  // 你的IR头文件
 
@@ -31,6 +31,53 @@ namespace MipsCodeGenerator {
 
 // 前向声明
 class MipsFunctionContext;
+
+struct VarLocation {
+    enum class Type {
+        STRING, // Represents a string value, e.g., register name or global label
+        INT,    // Represents an integer value, e.g., stack offset
+        UNINITIALIZED
+    };
+
+    Type type;
+    std::string s_val;
+    int i_val;
+
+    // Default constructor
+    VarLocation() : type(Type::UNINITIALIZED), i_val(0) {}
+
+    // Constructor for string type (e.g., register name, global label)
+    explicit VarLocation(const std::string& s_value) : type(Type::STRING), s_val(s_value), i_val(0) {}
+
+    // Constructor for int type (e.g., stack offset)
+    explicit VarLocation(int i_value) : type(Type::INT), s_val(""), i_val(i_value) {}
+
+    bool isString() const { return type == Type::STRING; }
+    bool isInt() const { return type == Type::INT; }
+    bool isUninitialized() const { return type == Type::UNINITIALIZED; }
+
+    // Getter for string value, with basic check
+    const std::string& getString() const {
+        if (!isString()) {
+            // Basic error handling: return an empty string or throw
+            // For now, returning a static empty string to avoid dynamic allocation in error path
+            static const std::string empty_string_on_error = "";
+            // std::cerr << "Error: VarLocation::getString() called on non-string type." << std::endl; // Optional: log error
+            return empty_string_on_error;
+        }
+        return s_val;
+    }
+
+    // Getter for int value, with basic check
+    int getInt() const {
+        if (!isInt()) {
+            // Basic error handling: return 0 or throw
+            // std::cerr << "Error: VarLocation::getInt() called on non-int type." << std::endl; // Optional: log error
+            return 0; // Or some other sentinel error value like std::numeric_limits<int>::min()
+        }
+        return i_val;
+    }
+};
 
 class MipsCodeGenerator {
     friend class MipsFunctionContext;
@@ -112,7 +159,8 @@ class MipsFunctionContext {
 
     // 变量位置映射：IRVariable名 -> (寄存器名 或 栈偏移量)
     // std::variant<std::string (reg), int (stack_offset)>
-    std::map<std::string, std::variant<std::string, int>> varLocations;
+    // std::map<std::string, std::variant<std::string, int>> varLocations;
+    std::map<std::string, VarLocation> varLocations;
     std::map<std::string, std::shared_ptr<IR::IRType>> varTypes;  // 存储变量类型，用于加载/存储
 
     // 寄存器分配信息

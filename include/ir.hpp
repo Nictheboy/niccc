@@ -2,7 +2,6 @@
 
 #include <map>
 #include <memory>
-#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -344,18 +343,19 @@ class CallNormalInst : public IRInstruction {
    public:
     std::string functionName;
     std::vector<std::shared_ptr<IROperand>> arguments;
-    std::optional<std::shared_ptr<IRVariable>> resultDestination;  // If function is not void
+    std::shared_ptr<IRVariable> resultDestination;
+    bool hasResultDestination;
 
     CallNormalInst(
         std::string funcName,
         std::vector<std::shared_ptr<IROperand>> args,
-        std::optional<std::shared_ptr<IRVariable>> resDest = std::nullopt)
-        : functionName(std::move(funcName)), arguments(std::move(args)), resultDestination(resDest) {}
+        std::shared_ptr<IRVariable> resDest = nullptr)
+        : functionName(std::move(funcName)), arguments(std::move(args)), resultDestination(resDest), hasResultDestination(resDest != nullptr) {}
 
     std::string toString() const override {
         std::string s = "";
-        if (resultDestination) {
-            s += (*resultDestination)->toString() + " = ";
+        if (hasResultDestination && resultDestination) {
+            s += resultDestination->toString() + " = ";
         }
         s += "CALL_NORMAL " + functionName + "(";
         for (size_t i = 0; i < arguments.size(); ++i) {
@@ -370,16 +370,18 @@ class CallNormalInst : public IRInstruction {
 
 class ReturnInst : public IRInstruction {
    public:
-    std::optional<std::shared_ptr<IROperand>> returnValue;  // nullopt for void returns
+    std::shared_ptr<IROperand> returnValue;
+    bool hasReturnValue;
 
-    ReturnInst(std::optional<std::shared_ptr<IROperand>> val = std::nullopt)
-        : returnValue(val) {}
+    ReturnInst(std::shared_ptr<IROperand> val = nullptr)
+        : returnValue(val), hasReturnValue(val != nullptr) {}
 
     std::string toString() const override {
-        if (returnValue) {
-            return "RETURN " + (*returnValue)->toString();
+        if (hasReturnValue && returnValue) {
+            return "RETURN " + returnValue->toString();
+        } else {
+            return "RETURN";
         }
-        return "RETURN";
     }
 };
 

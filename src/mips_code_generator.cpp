@@ -2,7 +2,6 @@
 #include <iomanip>   // For std::setfill, std::setw with std::hex (not strictly needed for current escape)
 #include <iostream>  // For std::cerr (debugging)
 #include <sstream>   // For std::ostringstream in escapeStringForMipsAsm
-#include <variant>   // For MipsFunctionContext::varLocations
 #include "ir.hpp"    // For IR::IRProgram, IR::NormalIRFunction, IR::ReturnInst, etc.
 
 namespace MipsCodeGenerator {
@@ -111,7 +110,11 @@ void MipsCodeGenerator::generateProgram(std::shared_ptr<IR::IRProgram> irProgram
         for (const auto& pair : irProgram->normalFunctions) {
             std::shared_ptr<IR::NormalIRFunction> func = pair.second;
             // if (func->name != "_start") { // _start is special, already generated
-                generateFunction(func);
+            // Skip generating generic function code for "printf" as it has a custom implementation
+            if (func->name == "printf") {
+                continue;
+            }
+            generateFunction(func);
             // }
         }
     }
@@ -179,8 +182,8 @@ void MipsCodeGenerator::generateFunction(std::shared_ptr<IR::NormalIRFunction> n
 // --- Instruction Visit Methods ---
 void MipsCodeGenerator::visit(std::shared_ptr<IR::ReturnInst> inst) {
     if (!currentFunctionContext) { return; }
-    if (inst->returnValue.has_value()) {
-        auto operand = inst->returnValue.value();
+    if (inst->hasReturnValue && inst->returnValue) {
+        auto operand = inst->returnValue;
         std::string reg = currentFunctionContext->ensureOperandInRegister(operand);
         if (reg != "$v0") {
             emit("move $v0, " + reg);
@@ -233,8 +236,8 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::CallNormalInst> inst) {
         currentFunctionContext->releaseRegister(reg);
     }
 
-    if (inst->resultDestination.has_value()) {
-        std::shared_ptr<IR::IRVariable> destVar = inst->resultDestination.value();
+    if (inst->hasResultDestination && inst->resultDestination) {
+        std::shared_ptr<IR::IRVariable> destVar = inst->resultDestination;
         // Result is in $v0. Store it to destVar.
         std::string dest_addr_reg; // For global vars
         if (currentProgram->globalVariables.count(destVar->name)) {
@@ -313,16 +316,15 @@ MipsFunctionContext::MipsFunctionContext(std::shared_ptr<IR::NormalIRFunction> f
     //    The `irFunction->locals` list contains explicitly declared local variables.
     int currentLocalOffset = 0;
     if (irFunction) { // Check if irFunction is not null
-        for (const auto& map_entry : irFunction->locals) {
-            const std::string& varName = map_entry.first;
-            std::shared_ptr<IR::IRVariable> irVar = map_entry.second;
-
-            // Assuming all local IRVariables are 4 bytes (int for SysY)
-            // TODO: Use irVar->type to determine size if types can vary.
-            int varSize = 4;
-            varLocations[varName] = currentLocalOffset; // Offset from $fp
-            generator->emit("# Local var " + varName + " assigned to stack offset " + std::to_string(currentLocalOffset) + "($fp)");
-            currentLocalOffset += varSize;
+        for (const auto& local_pair : irFunction->locals) {
+            const auto& varName = local_pair.first;
+            const auto& var = local_pair.second;
+            if (varLocations.find(varName) == varLocations.end()) { // Don't re-process params
+                varTypes[varName] = var->type;
+                currentLocalOffset -= 4;
+                // varLocations[varName] = currentLocalOffset; // Offset from $fp
+                varLocations[varName] = VarLocation(currentLocalOffset);
+            }
         }
     }
     this->totalLocalVarSize = currentLocalOffset;
@@ -435,47 +437,28 @@ void MipsFunctionContext::allocateLocalsAndTemporaries() { /* ... */ }
 
 int MipsFunctionContext::getVarStackOffset(const std::string& varName) {
     if (varLocations.count(varName)) {
-        // Assuming varLocations stores stack offset (int) for locals/params on stack
-        // If it could store a register string, that would be handled by isVarInRegister first.
-        try {
-             // Check if it holds an int (stack offset)
-            if (std::holds_alternative<int>(varLocations.at(varName))) {
-                 return std::get<int>(varLocations.at(varName));
-            }
-        } catch (const std::bad_variant_access& ex) {
-            generator->emit("# Error: Bad variant access for " + varName + " in getVarStackOffset: " + ex.what());
-        } catch (const std::out_of_range& ex) {
-            generator->emit("# Error: Variable " + varName + " not found in varLocations (out_of_range) in getVarStackOffset.");
+        const auto& loc = varLocations.at(varName);
+        if (loc.isInt()) {
+            return loc.getInt();
         }
     }
-    generator->emit("# Error: Variable " + varName + " not found or not a stack variable in getVarStackOffset. Defaulting to offset 0.");
-    return 0; // Error or default, should not happen if logic is correct
+    generator->output << "# ERROR: Variable " << varName << " not found on stack or varLocations entry is not int!\n";
+    return 0; // Default or error value
 }
 
 std::string MipsFunctionContext::getVarRegister(const std::string& varName) {
-    // This method is less relevant if we always load locals from stack into temps.
-    // If we implement register allocation for locals, this would return their assigned register.
-    // For now, varLocations primarily stores stack offsets (int).
     if (varLocations.count(varName)) {
-         try {
-            if (std::holds_alternative<std::string>(varLocations.at(varName))) {
-                return std::get<std::string>(varLocations.at(varName));
-            }
-        } catch (const std::bad_variant_access& ex) {
-             generator->emit("# Error: Bad variant access for " + varName + " in getVarRegister: " + ex.what());
-        } catch (const std::out_of_range& ex) {
-            generator->emit("# Error: Variable " + varName + " not found in varLocations (out_of_range) in getVarRegister.");
+        const auto& loc = varLocations.at(varName);
+        if (loc.isString()) { // Assuming string is register name
+            return loc.getString();
         }
     }
-    return ""; // Return empty if not in a register (i.e., on stack or not found)
+    return ""; // Not in a register or not found
 }
 
 bool MipsFunctionContext::isVarInRegister(const std::string& varName) {
-    // Companion to getVarRegister. True if varLocations[varName] holds a string (register name).
     if (varLocations.count(varName)) {
-        try {
-            return std::holds_alternative<std::string>(varLocations.at(varName));
-        } catch (const std::out_of_range& ex) { /* fall through */ }
+        return varLocations.at(varName).isString(); // Assuming string is register name
     }
     return false;
 }
