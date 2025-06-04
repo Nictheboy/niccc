@@ -1672,6 +1672,17 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
             
             bool is_global_var = (this->currentNormalFunction == nullptr); // Determine before initializer
             ir_variable->is_global = is_global_var;
+            
+            // For local variables, generate unique names to avoid conflicts with global variables
+            if (!is_global_var) {
+                // Check if there's a global variable with the same name
+                if (this->program && this->program->globalVariables.count(var_name)) {
+                    // Generate a unique name for the local variable
+                    std::string unique_local_name = var_name + "_local_" + std::to_string(tempVarCounter++);
+                    ir_variable->name = unique_local_name;
+                    std::cerr << "[IR_GEN] visitDecl: Renamed local variable '" << var_name << "' to '" << unique_local_name << "' to avoid global conflict." << std::endl;
+                }
+            }
 
             PNode initializer_node = nullptr;
             // Look for "=" after ArrayDimension (or after identifier if no ArrayDimension)
@@ -1852,8 +1863,12 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitLVal(PNNode node, bool forAssig
                   << symbol_info.is_const << ", has_const_value: " << symbol_info.has_const_value << ")" << std::endl;
         return nullptr;
     }
+    
+    // Add detailed debugging information about which variable was found
     std::cerr << "[IR_GEN] visitLVal: Found variable \'" << var_name << "\' in symbol table. Type: "
-              << (symbol_info.ir_type ? symbol_info.ir_type->toString() : "unknown_type") << std::endl;
+              << (symbol_info.ir_type ? symbol_info.ir_type->toString() : "unknown_type") 
+              << ", Is global: " << (symbol_info.variable->is_global ? "true" : "false")
+              << ", Variable pointer: " << symbol_info.variable.get() << std::endl;
 
     // Check for array access: LVal -> IDENT LBRACKET Exp RBRACKET ...
     // Example AST for arr[i]: children are IDENT("arr"), LBRACKET, Exp("i"), RBRACKET
