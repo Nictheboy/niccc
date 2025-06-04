@@ -608,6 +608,18 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::CallNormalInst> inst) {
 
     int argCount = inst->arguments.size();
     std::vector<std::string> arg_regs_used;
+    
+    // Handle arguments 5+ by pushing them onto the stack first (in reverse order)
+    for (int i = argCount - 1; i >= 4; --i) {
+        std::shared_ptr<IR::IROperand> argOperand = inst->arguments[i];
+        std::string argSrcReg = currentFunctionContext->ensureOperandInRegister(argOperand);
+        emit("addiu $sp, $sp, -4");  // Allocate 4 bytes on stack
+        emit("sw " + argSrcReg + ", 0($sp)");  // Store argument on stack
+        emit("# Pushed argument " + std::to_string(i + 1) + " onto stack");
+        currentFunctionContext->releaseRegister(argSrcReg);
+    }
+    
+    // Handle arguments 1-4 in registers
     for (int i = 0; i < argCount && i < 4; ++i) {
         std::shared_ptr<IR::IROperand> argOperand = inst->arguments[i];
         std::string argSrcReg = currentFunctionContext->ensureOperandInRegister(argOperand);
@@ -616,10 +628,15 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::CallNormalInst> inst) {
         emit("move " + targetArgReg + ", " + argSrcReg);
     }
 
-    // TODO: Pass arguments 5+ on stack
-
     emit("jal " + inst->functionName);
     emit("nop");  // Branch delay slot
+    
+    // Clean up stack arguments (5+ parameters) after the call
+    int stackArgsCount = (argCount > 4) ? (argCount - 4) : 0;
+    if (stackArgsCount > 0) {
+        emit("addiu $sp, $sp, " + std::to_string(stackArgsCount * 4));  // Deallocate stack space
+        emit("# Cleaned up " + std::to_string(stackArgsCount) + " stack arguments");
+    }
 
     // Release temporary registers used for arguments after the call
     for (const std::string& reg : arg_regs_used) {
@@ -767,7 +784,19 @@ void MipsFunctionContext::generatePrologue() {
         generator->emit("sw " + arg_reg + ", " + std::to_string(param_info.second) + "($fp)");
         generator->emit("# Stored " + arg_reg + " (param '" + param_info.first + "') to " + std::to_string(param_info.second) + "($fp)");
     }
-    // TODO: Handle parameters passed on stack (5th and onwards)
+    
+    // Handle parameters passed on stack (5th and onwards)
+    for (size_t i = 4; i < paramNamesAndOffsetsForPrologue.size(); ++i) {
+        const auto& param_info = paramNamesAndOffsetsForPrologue[i];
+        // Stack parameters are located above the saved $fp and $ra
+        // The first stack parameter is at offset 8($fp) (just above saved $ra)
+        // Each additional parameter is 4 bytes higher
+        int caller_stack_offset = 8 + ((i - 4) * 4);
+        std::string temp_reg = "$t0";  // Use $t0 as temporary
+        generator->emit("lw " + temp_reg + ", " + std::to_string(caller_stack_offset) + "($fp)");
+        generator->emit("sw " + temp_reg + ", " + std::to_string(param_info.second) + "($fp)");
+        generator->emit("# Loaded stack param '" + param_info.first + "' from " + std::to_string(caller_stack_offset) + "($fp) to " + std::to_string(param_info.second) + "($fp)");
+    }
 }
 
 void MipsFunctionContext::generateEpilogue() {

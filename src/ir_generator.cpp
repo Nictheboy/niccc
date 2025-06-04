@@ -2387,8 +2387,15 @@ std::vector<int> IRGenerator::parseArrayInitializer(PNNode initNode) {
                         init_values.push_back(const_operand->value);
                         std::cerr << "[IR_GEN] parseArrayInitializer: Added single constant value: " << const_operand->value << std::endl;
                     } else {
-                        std::cerr << "[IR_GEN_ERR] parseArrayInitializer: Non-constant expression in single InitVal." << std::endl;
-                        init_values.push_back(0); // Fallback
+                        // Try to evaluate constant array access if it's an LVal with array access
+                        std::shared_ptr<IR::IRConstant> const_result = tryEvaluateConstantArrayAccessFromExp(single_exp);
+                        if (const_result) {
+                            init_values.push_back(const_result->value);
+                            std::cerr << "[IR_GEN] parseArrayInitializer: Added constant array access value: " << const_result->value << std::endl;
+                        } else {
+                            std::cerr << "[IR_GEN_ERR] parseArrayInitializer: Non-constant expression in single InitVal." << std::endl;
+                            init_values.push_back(0); // Fallback
+                        }
                     }
                 } else {
                     std::cerr << "[IR_GEN_ERR] parseArrayInitializer: Failed to generate IR for single Exp." << std::endl;
@@ -2506,6 +2513,91 @@ std::vector<int> IRGenerator::parseInitValList(PNNode initValListNode) {
     
     std::cerr << "[IR_GEN_ERR] parseInitValList: Unexpected InitValList structure with " << initValListNode->children.size() << " children." << std::endl;
     return init_values;
+}
+
+// Helper function to evaluate constant array access at compile time
+std::shared_ptr<IR::IRConstant> IRGenerator::evaluateConstantArrayAccess(const std::string& array_name, int index) {
+    SymbolInfo symbol_info = symbolTable.lookupSymbol(array_name);
+    
+    if (!symbol_info.variable) {
+        return nullptr;
+    }
+    
+    // Check if it's a global constant array
+    if (!symbol_info.variable->is_global || !symbol_info.is_const) {
+        return nullptr;
+    }
+    
+    // Check if it has array initializer values
+    if (symbol_info.variable->array_initializer_values.empty()) {
+        return nullptr;
+    }
+    
+    // Check bounds
+    if (index < 0 || index >= static_cast<int>(symbol_info.variable->array_initializer_values.size())) {
+        return nullptr;
+    }
+    
+    int value = symbol_info.variable->array_initializer_values[index];
+    std::cerr << "[IR_GEN] evaluateConstantArrayAccess: " << array_name << "[" << index << "] = " << value << std::endl;
+    return std::make_shared<IR::IRConstant>(value);
+}
+
+// Helper function to try evaluating a constant array access from an Exp node
+std::shared_ptr<IR::IRConstant> IRGenerator::tryEvaluateConstantArrayAccessFromExp(PNode exp_node) {
+    // We need to walk down the expression tree to find if it's an LVal with array access
+    // Exp -> LOrExp -> LAndExp -> EqExp -> RelExp -> AddExp -> MulExp -> UnaryExp -> PrimaryExp -> LVal
+    
+    auto current_node = exp_node;
+    
+    // Walk down the chain until we find either LVal or we can't continue
+    while (current_node) {
+        auto nnode = std::dynamic_pointer_cast<AST::NonTerminalNode>(current_node);
+        if (!nnode) break;
+        
+        // If we found LVal, check if it's an array access
+        if (nnode->name == "LVal") {
+            return tryEvaluateConstantArrayAccessFromLVal(nnode);
+        }
+        
+        // Continue walking down if this is a single-child expression node
+        if (nnode->children.size() == 1) {
+            current_node = nnode->children[0];
+        } else {
+            break;
+        }
+    }
+    
+    return nullptr;
+}
+
+// Helper function to try evaluating a constant array access from an LVal node
+std::shared_ptr<IR::IRConstant> IRGenerator::tryEvaluateConstantArrayAccessFromLVal(PNNode lval_node) {
+    if (!lval_node || lval_node->name != "LVal" || lval_node->children.size() < 4) {
+        return nullptr;
+    }
+    
+    // Check if it's array access: LVal -> IDENT LBRACKET Exp RBRACKET
+    auto ident_node = std::dynamic_pointer_cast<AST::TerminalNode>(lval_node->children[0]);
+    auto lbracket_node = std::dynamic_pointer_cast<AST::TerminalNode>(lval_node->children[1]);
+    auto index_exp_node = lval_node->children[2];
+    auto rbracket_node = std::dynamic_pointer_cast<AST::TerminalNode>(lval_node->children[3]);
+    
+    if (!ident_node || !ident_node->token ||
+        !lbracket_node || !lbracket_node->token || lbracket_node->token->matched != "[" ||
+        !rbracket_node || !rbracket_node->token || rbracket_node->token->matched != "]") {
+        return nullptr;
+    }
+    
+    std::string array_name = ident_node->token->matched;
+    
+    // Try to evaluate the index expression as a constant
+    std::shared_ptr<IR::IROperand> index_operand = this->dispatchVisitExp(index_exp_node);
+    if (auto index_const = std::dynamic_pointer_cast<IR::IRConstant>(index_operand)) {
+        return evaluateConstantArrayAccess(array_name, index_const->value);
+    }
+    
+    return nullptr;
 }
 
 }  // namespace IRGenerator

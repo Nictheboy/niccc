@@ -114,6 +114,11 @@ class IRGenerator {
     // Array initialization
     std::vector<int> parseArrayInitializer(PNNode initNode);
     std::vector<int> parseInitValList(PNNode initValListNode);
+    
+    // Constant evaluation helpers
+    std::shared_ptr<IR::IRConstant> evaluateConstantArrayAccess(const std::string& array_name, int index);
+    std::shared_ptr<IR::IRConstant> tryEvaluateConstantArrayAccessFromExp(PNode exp_node);
+    std::shared_ptr<IR::IRConstant> tryEvaluateConstantArrayAccessFromLVal(PNNode lval_node);
 };
 
 };  // namespace IRGenerator
