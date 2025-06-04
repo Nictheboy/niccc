@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include "ir_generator.hpp"
 #include "mips_code_generator.hpp"
 #include "parser.hpp"
@@ -19,11 +20,49 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
+// Simple and crude method to remove C-style comments
+std::string removeComments(const std::string& input) {
+    std::string result = input;
+    
+    // Remove multi-line comments /* */
+    size_t pos = 0;
+    while ((pos = result.find("/*", pos)) != std::string::npos) {
+        size_t endPos = result.find("*/", pos + 2);
+        if (endPos != std::string::npos) {
+            result.erase(pos, endPos - pos + 2);
+        } else {
+            // If no closing */, remove everything from /* to end
+            result.erase(pos);
+            break;
+        }
+    }
+    
+    // Remove single-line comments //
+    pos = 0;
+    while ((pos = result.find("//", pos)) != std::string::npos) {
+        size_t endPos = result.find('\n', pos);
+        if (endPos != std::string::npos) {
+            result.erase(pos, endPos - pos);
+        } else {
+            // If no newline, remove everything from // to end
+            result.erase(pos);
+            break;
+        }
+    }
+    
+    return result;
+}
+
 int main(int argc, char* argv[]) {
     (void)argc;  // Mark argc as unused
     (void)argv;  // Mark argv as unused
     std::string filename = "testfile.txt";
     std::string input = readFile(filename);
+    
+    // Remove C-style comments using simple and crude method
+    input = removeComments(input);
+    std::cout << "After removing comments: '" << input << "'" << std::endl;
+    
     ScanContext scanContext(filename);
 
     // Create tokenizer and get definitions using the factory function
