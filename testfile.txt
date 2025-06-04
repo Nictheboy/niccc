@@ -1,67 +1,40 @@
-const int ArrLen = 20;
-int arr[ArrLen];       // ............
-int result[ArrLen];    // ..............................
+// test "Array1D, Array2D"
+const int value = 1, size = 10;
+const int constArray1D[3] = {value, value + 1, value + 2};
 
-void merge(int start, int mid, int end) {
-int k = 0;
-int i = start;
-int j = mid + 1;
+int main()
+{
+int i, j;
+int factorial[10], number[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+int matrixMulResult[4], matrixMulFactor[4] = {1, 2, 3, 4}; 
 
-while (i <= mid && j <= end) {
-if (arr[i] < arr[j]) {
-result[k] = arr[i];
-k = k+1;
-i = i+1;
-} else {
-result[k] = arr[j];
-k = k+1;
-j = j+1;
-}
-}
-
-while (i <= mid) {
-result[k] = arr[i];
-k = k+1;
-i = i+1;
-}
-
-while (j <= end) {
-result[k] = arr[j];
-k = k+1;
-j = j+1;
-}
-
-int m = 0; // .....................
-while (m < k) {
-arr[start + m] = result[m];
-m = m+1; // ..................
-}
-}
-
-void mergeSort(int start, int end) {
-if (start >= end)
-return;
-int mid = (start + end) / 2;
-mergeSort(start, mid);
-mergeSort(mid + 1, end);
-merge(start, mid, end);
-}
-
-int main() {
-int len = 10;
-int i = 0;
-while (i < len) {
-arr[i] = getint();
-i = i + 1;
-}
-
-mergeSort(0, len - 1);
-
+int tmp = 0;
 i = 0;
-while (i < len) {
-printf("arr[%d] = %d\n", i, arr[i]);
-i = i + 1;
+int size2 = 3;
+while (i < size2)
+{
+tmp = tmp + constArray1D[i]; // ...............const......
+i = i + 1;	
 }
+printf("sum of constArray1D: %d\n", tmp);
+
+factorial[0] = 1;
+i = 1;
+while (i < size)
+{
+factorial[i] = factorial[i-1] * number[i];
+i = i + 1;	
+}
+printf("num of factorial9: %d\n", factorial[9]);
+
+matrixMulResult[0] = matrixMulFactor[0] * 1 + matrixMulFactor[1] * 0;
+matrixMulResult[1] = matrixMulFactor[0] * 0 + matrixMulFactor[1] * 1;
+matrixMulResult[2] = matrixMulFactor[2] * 1 + matrixMulFactor[3] * 0;
+matrixMulResult[3] = matrixMulFactor[2] * 0 + matrixMulFactor[3] * 1;
+printf("%d %d\n", matrixMulResult[0], matrixMulResult[1]);
+printf("%d %d\n", matrixMulResult[2], matrixMulResult[3]);
+
 
 return 0;
 }
+

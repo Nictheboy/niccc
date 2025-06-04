@@ -72,7 +72,28 @@ void MipsCodeGenerator::generateProgram(std::shared_ptr<IR::IRProgram> irProgram
                     dataSegment += "# ERROR: Array '" + varName + "' has invalid size: " + std::to_string(total_elements) + "\n";
                     dataSegment += varName + ": .space 4 # Fallback allocation for problematic array\n"; 
                 } else {
-                    dataSegment += varName + ": .space " + std::to_string(total_elements * element_size) + " # Array: " + std::to_string(total_elements) + " elements * " + std::to_string(element_size) + " bytes each\n";
+                    // Initialize arrays with .word instead of .space to avoid alignment issues
+                    std::string init_values = "";
+                    
+                    // Use array_initializer_values if available
+                    if (!var->array_initializer_values.empty()) {
+                        for (int i = 0; i < total_elements; ++i) {
+                            if (i > 0) init_values += ", ";
+                            if (i < (int)var->array_initializer_values.size()) {
+                                init_values += std::to_string(var->array_initializer_values[i]);
+                            } else {
+                                init_values += "0"; // Pad with zeros if not enough initializers
+                            }
+                        }
+                        dataSegment += varName + ": .word " + init_values + " # Array: " + std::to_string(total_elements) + " elements, initialized\n";
+                    } else {
+                        // Default to all zeros
+                        for (int i = 0; i < total_elements; ++i) {
+                            if (i > 0) init_values += ", ";
+                            init_values += "0";
+                        }
+                        dataSegment += varName + ": .word " + init_values + " # Array: " + std::to_string(total_elements) + " elements\n";
+                    }
                 }
             } else if (var->global_initializer_constant) {  // Scalar with initializer
                 dataSegment += varName + ": .word " + std::to_string(var->global_initializer_constant->value) + "\n";
@@ -142,18 +163,62 @@ void MipsCodeGenerator::addData(const std::string& label, const std::string& typ
 }
 
 void MipsCodeGenerator::addGlobalVariable(const std::string& name, std::shared_ptr<IR::IRType> type) {
-    // For .space or default initialized .word
-    // SysY int is 4 bytes.
-    // For minimal, we might not have global vars in testfile.txt
-    // Example: addData(name, ".space", "4"); // For an int
+    // Basic implementation to create proper array data sections
+    if (auto simple_type = std::dynamic_pointer_cast<IR::SimpleIRType>(type)) {
+        if (simple_type->kind == IR::SimpleTypeKind::INTEGER) {
+            addData(name, ".word", "0");
+        } else {
+            addData(name, ".space", "4");
+        }
+    } else if (auto array_type = std::dynamic_pointer_cast<IR::ArrayIRType>(type)) {
+        // For arrays, we'll use .word with initial values or .space
+        int total_elements = 1;
+        for (int dim_size : array_type->dimension_sizes) {
+            total_elements *= dim_size;
+        }
+        
+        // For now, initialize with zeros using .word
+        std::string init_values = "";
+        for (int i = 0; i < total_elements; ++i) {
+            if (i > 0) init_values += ", ";
+            init_values += "0";
+        }
+        
+        dataSegment += name + ": .word " + init_values + " # Array: " + std::to_string(total_elements) + " elements\n";
+    } else {
+        addData(name, ".space", "4");
+    }
 }
 
 void MipsCodeGenerator::addGlobalVariable(const std::string& name, std::shared_ptr<IR::IRType> type, std::shared_ptr<IR::IRConstant> value) {
-    // For initialized .word
-    // For minimal, we might not have global vars in testfile.txt
-    // Example: if (auto int_const = std::dynamic_pointer_cast<IR::IRConstant>(value)) {
-    //     addData(name, ".word", std::to_string(int_const->value));
-    // }
+    // For initialized values
+    if (auto simple_type = std::dynamic_pointer_cast<IR::SimpleIRType>(type)) {
+        if (simple_type->kind == IR::SimpleTypeKind::INTEGER) {
+            if (value) {
+                addData(name, ".word", std::to_string(value->value));
+            } else {
+                addData(name, ".word", "0");
+            }
+        } else {
+            addData(name, ".space", "4");
+        }
+    } else if (auto array_type = std::dynamic_pointer_cast<IR::ArrayIRType>(type)) {
+        // For arrays, always initialize with zeros for now
+        int total_elements = 1;
+        for (int dim_size : array_type->dimension_sizes) {
+            total_elements *= dim_size;
+        }
+        
+        std::string init_values = "";
+        for (int i = 0; i < total_elements; ++i) {
+            if (i > 0) init_values += ", ";
+            init_values += "0";
+        }
+        
+        dataSegment += name + ": .word " + init_values + " # Array: " + std::to_string(total_elements) + " elements\n";
+    } else {
+        addData(name, ".space", "4");
+    }
 }
 
 void MipsCodeGenerator::emit(const std::string& instruction) {
@@ -653,13 +718,27 @@ MipsFunctionContext::MipsFunctionContext(std::shared_ptr<IR::NormalIRFunction> f
     // Process local variables
     for (const auto& local_pair : irFunction->locals) {
         const auto& varName = local_pair.first;
-        // const auto& var = local_pair.second; // var is IRVariable
+        const auto& var = local_pair.second; // var is IRVariable
         // Ensure we don't re-allocate space if a parameter name somehow clashes with a local
         // (though symbol table should prevent this from IRGenerator side)
         if (varLocations.find(varName) == varLocations.end()) { 
-            currentLocalOffset -= 4; // Allocate 4 bytes for the local variable
+            // Calculate the size needed for this variable based on its type
+            int varSize = 4; // Default for scalar variables
+            if (var && var->type) {
+                if (auto arrayType = std::dynamic_pointer_cast<IR::ArrayIRType>(var->type)) {
+                    // For arrays, calculate total size = num_elements * element_size
+                    int totalElements = 1;
+                    for (int dimension : arrayType->dimension_sizes) {
+                        totalElements *= dimension;
+                    }
+                    varSize = totalElements * 4; // Assuming 4 bytes per element (int)
+                    generator->emit("# Array variable '" + varName + "' needs " + std::to_string(varSize) + " bytes (" + std::to_string(totalElements) + " elements)");
+                }
+            }
+            
+            currentLocalOffset -= varSize; // Allocate the correct number of bytes
             varLocations[varName] = VarLocation(currentLocalOffset);
-            generator->emit("# Local var '" + varName + "' assigned stack offset: " + std::to_string(currentLocalOffset) + "($fp)");
+            generator->emit("# Local var '" + varName + "' assigned stack offset: " + std::to_string(currentLocalOffset) + "($fp) (size: " + std::to_string(varSize) + " bytes)");
         }
     }
     this->totalLocalVarSize = currentLocalOffset; // Will be <= 0
@@ -726,26 +805,23 @@ std::string MipsFunctionContext::ensureOperandInRegister(std::shared_ptr<IR::IRO
         generator->emit("li " + tempReg + ", " + std::to_string(constant->value));
         return tempReg;
     } else if (auto variable = std::dynamic_pointer_cast<IR::IRVariable>(operand)) {
-        // Check if it's a global variable first
-        if (generator->currentProgram && generator->currentProgram->globalVariables.count(variable->name)) {
+        // Check if it's a local variable or parameter first (local scope should override global scope)
+        if (varLocations.count(variable->name)) {
+            int offset = getVarStackOffset(variable->name);
+            std::string tempReg = reserveRegister();  // Reserve a general temp reg for the loaded value
+            generator->emit("lw " + tempReg + ", " + std::to_string(offset) + "($fp)");
+            generator->emit("# Loaded local var " + variable->name + " from " + std::to_string(offset) + "($fp) into " + tempReg);
+            return tempReg;
+        } else if (generator->currentProgram && generator->currentProgram->globalVariables.count(variable->name)) {
+            // If not found locally, then check if it's a global variable
             std::string tempReg = reserveRegister();                    // Register to hold the value
             generator->emit("la " + tempReg + ", " + variable->name);   // Load address of global
             generator->emit("lw " + tempReg + ", 0(" + tempReg + ")");  // Load word from that address
             generator->emit("# Loaded global var " + variable->name + " into " + tempReg);
             return tempReg;
         } else {
-            // Must be a local variable or parameter on the stack
-            if (varLocations.count(variable->name)) {
-                int offset = getVarStackOffset(variable->name);
-                std::string tempReg = reserveRegister();  // Reserve a general temp reg for the loaded value
-                // varLocations[variable->name] = tempReg; // No, varLocations stores stack offset or reg if allocated
-                generator->emit("lw " + tempReg + ", " + std::to_string(offset) + "($fp)");
-                generator->emit("# Loaded local var " + variable->name + " from " + std::to_string(offset) + "($fp) into " + tempReg);
-                return tempReg;
-            } else {
-                generator->emit("# Error: Local variable " + variable->name + " not found in varLocations during ensureOperandInRegister.");
-                return "$zero";  // Error case
-            }
+            generator->emit("# Error: Variable " + variable->name + " not found in local varLocations or global variables during ensureOperandInRegister.");
+            return "$zero";  // Error case
         }
     } else if (auto labelOp = std::dynamic_pointer_cast<IR::IRLabelOperand>(operand)) {
         // For string literals (labels), load their address

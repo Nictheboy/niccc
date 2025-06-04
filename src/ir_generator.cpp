@@ -1171,24 +1171,54 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitMulExp(PNNode node) {
         }
         std::cerr << "[IR_GEN] visitMulExp: RHS for operator '" << op_str << "': " << rhs_operand->toString() << std::endl;
 
-        std::string pure_func_name;
-        if (op_str == "*") {
-            pure_func_name = "__builtin_mul_int";
-        } else if (op_str == "/") {
-            pure_func_name = "__builtin_div_int";
-        } else if (op_str == "%") {
-            pure_func_name = "__builtin_mod_int";
+        // Try constant folding first
+        auto lhs_const = std::dynamic_pointer_cast<IR::IRConstant>(current_lhs_operand);
+        auto rhs_const = std::dynamic_pointer_cast<IR::IRConstant>(rhs_operand);
+        
+        if (lhs_const && rhs_const) {
+            // Both operands are constants, do constant folding
+            int result_value;
+            if (op_str == "*") {
+                result_value = lhs_const->value * rhs_const->value;
+            } else if (op_str == "/") {
+                if (rhs_const->value == 0) {
+                    std::cerr << "[IR_GEN_ERR] visitMulExp: Division by zero in constant expression." << std::endl;
+                    return nullptr;
+                }
+                result_value = lhs_const->value / rhs_const->value;
+            } else if (op_str == "%") {
+                if (rhs_const->value == 0) {
+                    std::cerr << "[IR_GEN_ERR] visitMulExp: Modulo by zero in constant expression." << std::endl;
+                    return nullptr;
+                }
+                result_value = lhs_const->value % rhs_const->value;
+            } else {
+                std::cerr << "[IR_GEN_ERR] visitMulExp: Unknown operator: " << op_str << std::endl;
+                return nullptr;
+            }
+            current_lhs_operand = std::make_shared<IR::IRConstant>(result_value);
+            std::cerr << "[IR_GEN] visitMulExp: Constant folding '" << lhs_const->value << " " << op_str << " " << rhs_const->value << "' = " << result_value << std::endl;
         } else {
-            std::cerr << "[IR_GEN_ERR] visitMulExp: Unknown operator: " << op_str << std::endl;
-            return nullptr;
-        }
+            // At least one operand is not constant, generate runtime instruction
+            std::string pure_func_name;
+            if (op_str == "*") {
+                pure_func_name = "__builtin_mul_int";
+            } else if (op_str == "/") {
+                pure_func_name = "__builtin_div_int";
+            } else if (op_str == "%") {
+                pure_func_name = "__builtin_mod_int";
+            } else {
+                std::cerr << "[IR_GEN_ERR] visitMulExp: Unknown operator: " << op_str << std::endl;
+                return nullptr;
+            }
 
-        auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_muldiv_");
-        addInstruction(std::make_shared<IR::CallPureInst>(pure_func_name, 
-                                                       std::vector<std::shared_ptr<IR::IROperand>>{current_lhs_operand, rhs_operand},
-                                                       std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
-        current_lhs_operand = result_temp;
-        std::cerr << "[IR_GEN] visitMulExp: Generated CallPureInst for '" << op_str << "', result in " << result_temp->name << std::endl;
+            auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_muldiv_");
+            addInstruction(std::make_shared<IR::CallPureInst>(pure_func_name, 
+                                                           std::vector<std::shared_ptr<IR::IROperand>>{current_lhs_operand, rhs_operand},
+                                                           std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
+            current_lhs_operand = result_temp;
+            std::cerr << "[IR_GEN] visitMulExp: Generated CallPureInst for '" << op_str << "', result in " << result_temp->name << std::endl;
+        }
     }
 
     std::cerr << "[IR_GEN] visitMulExp: Final result: " << current_lhs_operand->toString() << std::endl;
@@ -1231,22 +1261,42 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitAddExp(PNNode node) {
         }
         std::cerr << "[IR_GEN] visitAddExp: RHS for operator '" << op_str << "': " << rhs_operand->toString() << std::endl;
 
-        std::string pure_func_name;
-        if (op_str == "+") {
-            pure_func_name = "__builtin_add_int";
-        } else if (op_str == "-") {
-            pure_func_name = "__builtin_sub_int";
+        // Try constant folding first
+        auto lhs_const = std::dynamic_pointer_cast<IR::IRConstant>(current_lhs_operand);
+        auto rhs_const = std::dynamic_pointer_cast<IR::IRConstant>(rhs_operand);
+        
+        if (lhs_const && rhs_const) {
+            // Both operands are constants, do constant folding
+            int result_value;
+            if (op_str == "+") {
+                result_value = lhs_const->value + rhs_const->value;
+            } else if (op_str == "-") {
+                result_value = lhs_const->value - rhs_const->value;
+            } else {
+                std::cerr << "[IR_GEN_ERR] visitAddExp: Unknown operator: " << op_str << std::endl;
+                return nullptr;
+            }
+            current_lhs_operand = std::make_shared<IR::IRConstant>(result_value);
+            std::cerr << "[IR_GEN] visitAddExp: Constant folding '" << lhs_const->value << " " << op_str << " " << rhs_const->value << "' = " << result_value << std::endl;
         } else {
-            std::cerr << "[IR_GEN_ERR] visitAddExp: Unknown operator: " << op_str << std::endl;
-            return nullptr;
-        }
+            // At least one operand is not constant, generate runtime instruction
+            std::string pure_func_name;
+            if (op_str == "+") {
+                pure_func_name = "__builtin_add_int";
+            } else if (op_str == "-") {
+                pure_func_name = "__builtin_sub_int";
+            } else {
+                std::cerr << "[IR_GEN_ERR] visitAddExp: Unknown operator: " << op_str << std::endl;
+                return nullptr;
+            }
 
-        auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_addsub_");
-        addInstruction(std::make_shared<IR::CallPureInst>(pure_func_name, 
-                                                       std::vector<std::shared_ptr<IR::IROperand>>{current_lhs_operand, rhs_operand},
-                                                       std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
-        current_lhs_operand = result_temp;
-        std::cerr << "[IR_GEN] visitAddExp: Generated CallPureInst for '" << op_str << "', result in " << result_temp->name << std::endl;
+            auto result_temp = createTempSimpleVar(IR::SimpleTypeKind::INTEGER, "%tmp_addsub_");
+            addInstruction(std::make_shared<IR::CallPureInst>(pure_func_name, 
+                                                           std::vector<std::shared_ptr<IR::IROperand>>{current_lhs_operand, rhs_operand},
+                                                           std::vector<std::shared_ptr<IR::IRVariable>>{result_temp}));
+            current_lhs_operand = result_temp;
+            std::cerr << "[IR_GEN] visitAddExp: Generated CallPureInst for '" << op_str << "', result in " << result_temp->name << std::endl;
+        }
     }
     std::cerr << "[IR_GEN] visitAddExp: Final result: " << current_lhs_operand->toString() << std::endl;
     return current_lhs_operand;
@@ -1337,9 +1387,17 @@ std::shared_ptr<IR::IROperand> IRGenerator::dispatchVisitExp(PNode node_base) {
             std::cerr << "[IR_GEN] dispatchVisitExp: Number node does not have expected terminal child." << std::endl;
             return nullptr;
         } else if (pn_node->name == "LVal") {
-            std::cerr << "[IR_GEN] dispatchVisitExp: LVal encountered. Needs visitLVal implementation." << std::endl;
-            // return this->visitLVal(pn_node); // Implement this
-            return nullptr;
+            std::cerr << "[IR_GEN] dispatchVisitExp: LVal encountered. Calling visitLVal." << std::endl;
+            return this->visitLVal(pn_node); // This is already implemented
+        } else if (pn_node->name == "InitVal") {
+            std::cerr << "[IR_GEN] dispatchVisitExp: InitVal encountered. Dispatching to first child." << std::endl;
+            // InitVal typically wraps an Exp or similar, so dispatch to its first child
+            if (!pn_node->children.empty()) {
+                return this->dispatchVisitExp(pn_node->children.at(0));
+            } else {
+                std::cerr << "[IR_GEN_ERR] dispatchVisitExp: InitVal node has no children." << std::endl;
+                return nullptr;
+            }
         } else if (pn_node->name == "FunctionCall") {
             std::cerr << "[IR_GEN] dispatchVisitExp: FunctionCall node encountered." << std::endl;
             if (pn_node->children.size() >= 1) {
@@ -1625,8 +1683,8 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
                 if (assign_op_node && assign_op_node->token && assign_op_node->token->matched == "=") {
                     if (current_child_idx + 1 < decl_node->children.size()) {
                         auto init_val_wrapper_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(decl_node->children.at(current_child_idx + 1));
-                        if (init_val_wrapper_node && init_val_wrapper_node->name == "InitVal" && !init_val_wrapper_node->children.empty()) {
-                            initializer_node = init_val_wrapper_node->children.at(0);
+                        if (init_val_wrapper_node && init_val_wrapper_node->name == "InitVal") {
+                            initializer_node = init_val_wrapper_node; // Use the entire InitVal node, not its first child
                             std::cerr << "[IR_GEN] visitDecl: Found initializer for '" << var_name << "'." << std::endl;
                         }
                     }
@@ -1639,43 +1697,85 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
             bool has_parsed_const_val = false;
 
             if (initializer_node) {
-                std::shared_ptr<IR::IROperand> init_val_operand = this->dispatchVisitExp(initializer_node);
-                if (init_val_operand) {
-                    if (is_const && !is_array_decl) { 
-                        if (auto const_init_op = std::dynamic_pointer_cast<IR::IRConstant>(init_val_operand)) {
-                            parsed_const_val = const_init_op->value;
-                            has_parsed_const_val = true;
-                            std::cerr << "[IR_GEN] visitDecl: Const scalar '" << var_name << "' has constant initializer value: " << parsed_const_val << std::endl;
-                            if (is_global_var) { // Store for .data segment if global const scalar
-                                ir_variable->global_initializer_constant = const_init_op;
-                            }
-                        } else {
-                            std::cerr << "[IR_GEN_ERR] visitDecl: Const scalar '" << var_name << "' does not have a constant initializer that resolved to IRConstant." << std::endl;
-                        }
-                    }
+                if (is_array_decl) { 
+                    std::cerr << "[IR_GEN] visitDecl: Processing array initializer for '" << var_name << "'." << std::endl;
+                    std::cerr << "[IR_GEN] visitDecl: initializer_node type: " << (initializer_node ? typeid(*initializer_node).name() : "null") << std::endl;
                     
-                    if (is_array_decl) { 
-                        std::cerr << "[IR_GEN_WARN] visitDecl: Array initializers (e.g. int a[] = {1,2};) are not supported. Ignoring for '" << var_name << "'." << std::endl;
-                    } else if (is_global_var && !is_const) { 
-                        if (auto const_init_val = std::dynamic_pointer_cast<IR::IRConstant>(init_val_operand)) {
-                            ir_variable->global_initializer_constant = const_init_val; 
-                            std::cerr << "[IR_GEN] visitDecl: Stored .data initializer for global non-const scalar '" << var_name << "'." << std::endl;
+                    // Parse array initializer list directly (don't use dispatchVisitExp for InitVal)
+                    auto init_nnode = std::dynamic_pointer_cast<AST::NonTerminalNode>(initializer_node);
+                    if (init_nnode) {
+                        std::cerr << "[IR_GEN] visitDecl: Calling parseArrayInitializer for node: " << init_nnode->name << std::endl;
+                        std::vector<int> init_values = parseArrayInitializer(init_nnode);
+                        
+                        if (is_global_var) {
+                            // For global arrays, set the initializer values for data section
+                            ir_variable->array_initializer_values = init_values;
+                            std::cerr << "[IR_GEN] visitDecl: Global array '" << var_name << "' initialized with " << init_values.size() << " values." << std::endl;
                         } else {
-                            std::cerr << "[IR_GEN_ERR] visitDecl: Non-constant initializer for global non-const scalar '" << var_name << "' requires runtime init." << std::endl;
+                            // For local arrays, generate runtime initialization instructions
+                            std::cerr << "[IR_GEN] visitDecl: Generating runtime initialization for local array '" << var_name << "' with " << init_values.size() << " values." << std::endl;
+                            
+                            if (this->currentNormalFunction) {
+                                for (size_t i = 0; i < init_values.size(); ++i) {
+                                    // Create index constant
+                                    auto index_const = std::make_shared<IR::IRConstant>(static_cast<int>(i));
+                                    // Create value constant
+                                    auto value_const = std::make_shared<IR::IRConstant>(init_values[i]);
+                                    // Create StoreArrayInst: arr[i] = value
+                                    auto store_inst = std::make_shared<IR::StoreArrayInst>(ir_variable, std::vector<std::shared_ptr<IR::IROperand>>{index_const}, value_const);
+                                    this->addInstruction(store_inst);
+                                    std::cerr << "[IR_GEN] visitDecl: Added StoreArrayInst for '" << var_name << "[" << i << "] = " << init_values[i] << "'" << std::endl;
+                                }
+                            } else {
+                                std::cerr << "[IR_GEN_ERR] visitDecl: currentNormalFunction is null for local array '" << var_name << "'." << std::endl;
+                            }
                         }
-                    } else if (!is_global_var && !is_array_decl) { // Local scalar (const or non-const)
-                        if (this->currentNormalFunction) {
-                            // For local const scalars, we still add an assign instruction to ensure the value is "loaded" if used.
-                            // The const-ness is primarily for semantic checks by the compiler.
-                            auto assign_inst = std::make_shared<IR::AssignInst>(ir_variable, init_val_operand);
-                            this->addInstruction(assign_inst);
-                            std::cerr << "[IR_GEN] visitDecl: Added AssignInst for local scalar initializer of '" << var_name << "'." << std::endl;
-                        } else { 
-                            std::cerr << "[IR_GEN_ERR] visitDecl: Null currentNormalFunction for local scalar '" << var_name << "'." << std::endl;
+                    } else {
+                        std::cerr << "[IR_GEN_ERR] visitDecl: Array initializer for '" << var_name << "' is not a NonTerminalNode." << std::endl;
+                        // Try to cast to TerminalNode and see what token it contains
+                        auto init_tnode = std::dynamic_pointer_cast<AST::TerminalNode>(initializer_node);
+                        if (init_tnode && init_tnode->token) {
+                            std::cerr << "[IR_GEN] visitDecl: TerminalNode token matched: '" << init_tnode->token->matched << "'" << std::endl;
+                        } else {
+                            std::cerr << "[IR_GEN_ERR] visitDecl: Failed to cast to TerminalNode or no token." << std::endl;
                         }
                     }
                 } else {
-                    std::cerr << "[IR_GEN_ERR] visitDecl: Failed to generate IR for initializer of '" << var_name << "'." << std::endl;
+                    // For non-array variables, use dispatchVisitExp to handle scalar initializers
+                    std::shared_ptr<IR::IROperand> init_val_operand = this->dispatchVisitExp(initializer_node);
+                    if (init_val_operand) {
+                        if (is_const) { 
+                            if (auto const_init_op = std::dynamic_pointer_cast<IR::IRConstant>(init_val_operand)) {
+                                parsed_const_val = const_init_op->value;
+                                has_parsed_const_val = true;
+                                std::cerr << "[IR_GEN] visitDecl: Const scalar '" << var_name << "' has constant initializer value: " << parsed_const_val << std::endl;
+                                if (is_global_var) { // Store for .data segment if global const scalar
+                                    ir_variable->global_initializer_constant = const_init_op;
+                                }
+                            } else {
+                                std::cerr << "[IR_GEN_ERR] visitDecl: Const scalar '" << var_name << "' does not have a constant initializer that resolved to IRConstant." << std::endl;
+                            }
+                        } else if (is_global_var) { 
+                            if (auto const_init_val = std::dynamic_pointer_cast<IR::IRConstant>(init_val_operand)) {
+                                ir_variable->global_initializer_constant = const_init_val; 
+                                std::cerr << "[IR_GEN] visitDecl: Stored .data initializer for global non-const scalar '" << var_name << "'." << std::endl;
+                            } else {
+                                std::cerr << "[IR_GEN_ERR] visitDecl: Non-constant initializer for global non-const scalar '" << var_name << "' requires runtime init." << std::endl;
+                            }
+                        } else { // Local scalar (const or non-const)
+                            if (this->currentNormalFunction) {
+                                // For local const scalars, we still add an assign instruction to ensure the value is "loaded" if used.
+                                // The const-ness is primarily for semantic checks by the compiler.
+                                auto assign_inst = std::make_shared<IR::AssignInst>(ir_variable, init_val_operand);
+                                this->addInstruction(assign_inst);
+                                std::cerr << "[IR_GEN] visitDecl: Added AssignInst for local scalar initializer of '" << var_name << "'." << std::endl;
+                            } else { 
+                                std::cerr << "[IR_GEN_ERR] visitDecl: Null currentNormalFunction for local scalar '" << var_name << "'." << std::endl;
+                            }
+                        }
+                    } else {
+                        std::cerr << "[IR_GEN_ERR] visitDecl: Failed to generate IR for scalar initializer of '" << var_name << "'." << std::endl;
+                    }
                 }
             } else if (is_const && !is_array_decl) { 
                  std::cerr << "[IR_GEN_ERR] visitDecl: Const scalar '" << var_name << "' is missing an initializer." << std::endl;
@@ -2258,6 +2358,154 @@ void IRGenerator::visitContinueStmt(PNNode node) {
     auto continue_target_label = loopLabelStack.back().first;
     addInstruction(std::make_shared<IR::JumpInst>(continue_target_label));
     std::cerr << "[IR_GEN] visitContinueStmt: Added JumpInst to continue_target_label: " << continue_target_label->labelName << std::endl;
+}
+
+std::vector<int> IRGenerator::parseArrayInitializer(PNNode initNode) {
+    std::cerr << "[IR_GEN] parseArrayInitializer() called for node: " << (initNode ? initNode->name : "null") << std::endl;
+    std::vector<int> init_values;
+    
+    if (!initNode) {
+        std::cerr << "[IR_GEN_ERR] parseArrayInitializer: InitVal node is null." << std::endl;
+        return init_values;
+    }
+    
+    if (initNode->name != "InitVal") {
+        std::cerr << "[IR_GEN_ERR] parseArrayInitializer: Expected InitVal node, got: " << initNode->name << std::endl;
+        return init_values;
+    }
+    
+    // Handle single expression InitVal (like individual numbers in array initializer)
+    // Grammar: InitVal -> Exp
+    if (initNode->children.size() == 1) {
+        auto single_exp = initNode->children[0];
+        if (auto exp_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(single_exp)) {
+            if (exp_node->name == "Exp") {
+                std::cerr << "[IR_GEN] parseArrayInitializer: Processing single Exp in InitVal." << std::endl;
+                std::shared_ptr<IR::IROperand> operand = this->dispatchVisitExp(single_exp);
+                if (operand) {
+                    if (auto const_operand = std::dynamic_pointer_cast<IR::IRConstant>(operand)) {
+                        init_values.push_back(const_operand->value);
+                        std::cerr << "[IR_GEN] parseArrayInitializer: Added single constant value: " << const_operand->value << std::endl;
+                    } else {
+                        std::cerr << "[IR_GEN_ERR] parseArrayInitializer: Non-constant expression in single InitVal." << std::endl;
+                        init_values.push_back(0); // Fallback
+                    }
+                } else {
+                    std::cerr << "[IR_GEN_ERR] parseArrayInitializer: Failed to generate IR for single Exp." << std::endl;
+                    init_values.push_back(0); // Fallback
+                }
+                return init_values;
+            }
+        }
+        std::cerr << "[IR_GEN_ERR] parseArrayInitializer: Single child is not an Exp node." << std::endl;
+        return init_values;
+    }
+    
+    // Handle empty initializer: InitVal -> LBRACE RBRACE
+    if (initNode->children.size() == 2) {
+        auto lbrace = std::dynamic_pointer_cast<AST::TerminalNode>(initNode->children[0]);
+        auto rbrace = std::dynamic_pointer_cast<AST::TerminalNode>(initNode->children[1]);
+        if (lbrace && lbrace->token && lbrace->token->matched == "{" &&
+            rbrace && rbrace->token && rbrace->token->matched == "}") {
+            std::cerr << "[IR_GEN] parseArrayInitializer: Empty initializer list." << std::endl;
+            return init_values; // Empty list
+        }
+    }
+    
+    // Handle aggregate initializer: InitVal -> LBRACE InitVal InitValList RBRACE
+    // Grammar: InitVal -> LBRACE InitVal InitValList RBRACE
+    // initNode->children[0]: LBRACE
+    // initNode->children[1]: First InitVal 
+    // initNode->children[2]: InitValList (remaining elements)
+    // initNode->children[3]: RBRACE
+    if (initNode->children.size() == 4) {
+        std::cerr << "[IR_GEN] parseArrayInitializer: Processing aggregate initializer with 4 children." << std::endl;
+        
+        // Parse first InitVal (index 1)
+        auto first_init_val = std::dynamic_pointer_cast<AST::NonTerminalNode>(initNode->children[1]);
+        if (first_init_val && first_init_val->name == "InitVal") {
+            std::cerr << "[IR_GEN] parseArrayInitializer: Processing first InitVal element." << std::endl;
+            std::vector<int> first_values = parseArrayInitializer(first_init_val);
+            for (int val : first_values) {
+                init_values.push_back(val);
+                std::cerr << "[IR_GEN] parseArrayInitializer: Added first element value: " << val << std::endl;
+            }
+        }
+        
+        // Parse InitValList (index 2) - contains remaining elements
+        auto init_val_list = std::dynamic_pointer_cast<AST::NonTerminalNode>(initNode->children[2]);
+        if (init_val_list && init_val_list->name == "InitValList") {
+            std::cerr << "[IR_GEN] parseArrayInitializer: Processing InitValList." << std::endl;
+            std::vector<int> list_values = parseInitValList(init_val_list);
+            for (int val : list_values) {
+                init_values.push_back(val);
+                std::cerr << "[IR_GEN] parseArrayInitializer: Added list element value: " << val << std::endl;
+            }
+        }
+        
+        std::cerr << "[IR_GEN] parseArrayInitializer: Parsed " << init_values.size() << " initializer values." << std::endl;
+        return init_values;
+    }
+    
+    std::cerr << "[IR_GEN_ERR] parseArrayInitializer: Unexpected InitVal structure with " << initNode->children.size() << " children." << std::endl;
+    return init_values;
+}
+
+std::vector<int> IRGenerator::parseInitValList(PNNode initValListNode) {
+    std::cerr << "[IR_GEN] parseInitValList() called for node: " << (initValListNode ? initValListNode->name : "null") << std::endl;
+    std::vector<int> init_values;
+    
+    if (!initValListNode) {
+        std::cerr << "[IR_GEN_ERR] parseInitValList: InitValList node is null." << std::endl;
+        return init_values;
+    }
+    
+    if (initValListNode->name != "InitValList") {
+        std::cerr << "[IR_GEN_ERR] parseInitValList: Expected InitValList node, got: " << initValListNode->name << std::endl;
+        return init_values;
+    }
+    
+    // Handle empty InitValList (epsilon production)
+    if (initValListNode->children.size() == 0) {
+        std::cerr << "[IR_GEN] parseInitValList: Empty InitValList (epsilon)." << std::endl;
+        return init_values;
+    }
+    
+    // Handle non-empty InitValList: InitValList -> COMMA InitVal InitValList
+    // initValListNode->children[0]: COMMA
+    // initValListNode->children[1]: InitVal
+    // initValListNode->children[2]: InitValList (remaining)
+    if (initValListNode->children.size() == 3) {
+        std::cerr << "[IR_GEN] parseInitValList: Processing non-empty InitValList with 3 children." << std::endl;
+        
+        // Parse the InitVal (index 1)
+        auto init_val = std::dynamic_pointer_cast<AST::NonTerminalNode>(initValListNode->children[1]);
+        if (init_val && init_val->name == "InitVal") {
+            std::cerr << "[IR_GEN] parseInitValList: Processing InitVal element." << std::endl;
+            std::vector<int> values = parseArrayInitializer(init_val);
+            for (int val : values) {
+                init_values.push_back(val);
+                std::cerr << "[IR_GEN] parseInitValList: Added value: " << val << std::endl;
+            }
+        }
+        
+        // Parse the remaining InitValList (index 2)
+        auto remaining_list = std::dynamic_pointer_cast<AST::NonTerminalNode>(initValListNode->children[2]);
+        if (remaining_list && remaining_list->name == "InitValList") {
+            std::cerr << "[IR_GEN] parseInitValList: Processing remaining InitValList." << std::endl;
+            std::vector<int> remaining_values = parseInitValList(remaining_list);
+            for (int val : remaining_values) {
+                init_values.push_back(val);
+                std::cerr << "[IR_GEN] parseInitValList: Added remaining value: " << val << std::endl;
+            }
+        }
+        
+        std::cerr << "[IR_GEN] parseInitValList: Parsed " << init_values.size() << " values from InitValList." << std::endl;
+        return init_values;
+    }
+    
+    std::cerr << "[IR_GEN_ERR] parseInitValList: Unexpected InitValList structure with " << initValListNode->children.size() << " children." << std::endl;
+    return init_values;
 }
 
 }  // namespace IRGenerator

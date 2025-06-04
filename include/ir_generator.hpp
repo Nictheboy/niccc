@@ -110,6 +110,10 @@ class IRGenerator {
     // Declaration visitors
     void visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> base_ir_type, bool is_const);
     void visitConstDef(PNNode node);
+    
+    // Array initialization
+    std::vector<int> parseArrayInitializer(PNNode initNode);
+    std::vector<int> parseInitValList(PNNode initValListNode);
 };
 
 };  // namespace IRGenerator

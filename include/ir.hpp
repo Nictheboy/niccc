@@ -156,6 +156,7 @@ class IRVariable : public IROperand {
     bool is_global; // Optional: could be useful
     bool is_const;  // To help with assignments
     std::shared_ptr<IRConstant> global_initializer_constant; // For global inits
+    std::vector<int> array_initializer_values; // For array initialization lists
 
     IRVariable(std::string n, std::shared_ptr<IRType> t, bool is_global = false, bool is_const = false)
         : IROperand(t), name(std::move(n)), is_global(is_global), is_const(is_const), global_initializer_constant(nullptr) {}
