@@ -102,525 +102,517 @@ getint:
 	addi $sp, $sp, 8
 	jr $ra
 	nop
-	# Local var '%tmp_arr_load_0' assigned stack offset: -4($fp) (size: 4 bytes)
-	# Local var '%tmp_arr_load_1' assigned stack offset: -8($fp) (size: 4 bytes)
-	# Local var '%tmp_arr_load_2' assigned stack offset: -12($fp) (size: 4 bytes)
-	# Local var '%tmp_arr_load_3' assigned stack offset: -16($fp) (size: 4 bytes)
-	# Local var '%tmp_arr_load_4' assigned stack offset: -20($fp) (size: 4 bytes)
-	# Local var '%tmp_arr_load_5' assigned stack offset: -24($fp) (size: 4 bytes)
-	# Local var '%tmp_arr_load_6' assigned stack offset: -28($fp) (size: 4 bytes)
-	# Local var '%tmp_arr_load_7' assigned stack offset: -32($fp) (size: 4 bytes)
-	# Local var '%tmp_arr_load_8' assigned stack offset: -36($fp) (size: 4 bytes)
-	# Array variable 'arr' needs 24 bytes (6 elements)
-	# Local var 'arr' assigned stack offset: -60($fp) (size: 24 bytes)
-	# Function main: totalLocalVarSize = -60, frameSize = 68
+	# Local var '%tmp_addsub_0' assigned stack offset: -4($fp) (size: 4 bytes)
+	# Local var '%tmp_addsub_1' assigned stack offset: -8($fp) (size: 4 bytes)
+	# Local var '%tmp_addsub_15' assigned stack offset: -12($fp) (size: 4 bytes)
+	# Local var '%tmp_addsub_18' assigned stack offset: -16($fp) (size: 4 bytes)
+	# Local var '%tmp_addsub_19' assigned stack offset: -20($fp) (size: 4 bytes)
+	# Local var '%tmp_addsub_20' assigned stack offset: -24($fp) (size: 4 bytes)
+	# Local var '%tmp_addsub_3' assigned stack offset: -28($fp) (size: 4 bytes)
+	# Local var '%tmp_addsub_4' assigned stack offset: -32($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_10' assigned stack offset: -36($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_11' assigned stack offset: -40($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_12' assigned stack offset: -44($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_13' assigned stack offset: -48($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_14' assigned stack offset: -52($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_16' assigned stack offset: -56($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_17' assigned stack offset: -60($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_6' assigned stack offset: -64($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_7' assigned stack offset: -68($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_8' assigned stack offset: -72($fp) (size: 4 bytes)
+	# Local var '%tmp_muldiv_9' assigned stack offset: -76($fp) (size: 4 bytes)
+	# Local var '%tmp_uneg_2' assigned stack offset: -80($fp) (size: 4 bytes)
+	# Local var '%tmp_uneg_5' assigned stack offset: -84($fp) (size: 4 bytes)
+	# Local var 'd' assigned stack offset: -88($fp) (size: 4 bytes)
+	# Local var 'e' assigned stack offset: -92($fp) (size: 4 bytes)
+	# Local var 'f' assigned stack offset: -96($fp) (size: 4 bytes)
+	# Local var 'testBlock' assigned stack offset: -100($fp) (size: 4 bytes)
+	# Function main: totalLocalVarSize = -100, frameSize = 108
 main:
 	# Prologue for main
-	addiu $sp, $sp, -68
-	sw $ra, 64($sp)
-	sw $fp, 60($sp)
-	addiu $fp, $sp, 60
-	# LoadArrayInst: %tmp_arr_load_0:INTEGER = LOAD arrc:ARRAY(dims=1, sizes=[6], type=INTEGER)[5]
+	addiu $sp, $sp, -108
+	sw $ra, 104($sp)
+	sw $fp, 100($sp)
+	addiu $fp, $sp, 100
+	# --- Calling function: printf ---
+	# Ensuring operand label _S0 is in a register
 	# Reserved temporary register $t0
-	la $t0, arrc
-	# Loaded base address of global array 'arrc' into $t0
-	# Ensuring operand 5 is in a register
+	la $t0, _S0
+	# Loaded address of label _S0 into $t0
+	move $a0, $t0
+	# Ensuring operand testBlock:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 5
-	# Index value for 'arrc' is in $t1
-	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arrc[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arrc[index]' into temp reg $t4
-	sw $t4, -4($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_0' at offset -4
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	la $t1, testBlock
+	lw $t1, 0($t1)
+	# Loaded global var testBlock into $t1
+	move $a1, $t1
+	jal printf
+	nop
 	# Released temporary register $t0
-	# --- End of LoadArrayInst for arrc ---
-	# StoreArrayInst: STORE arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[0], 1
-	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 0 is in a register
-	# Reserved temporary register $t1
-	li $t1, 0
-	# Index value for 'arr' is in $t1
-	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Ensuring operand 1 is in a register
-	# Reserved temporary register $t4
-	li $t4, 1
-	# Value to store in 'arr[index]' is in $t4
-	sw $t4, 0($t0)
-	# Stored value from $t4 into 'arr[index]'
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
 	# Released temporary register $t1
-	# Released temporary register $t0
-	# --- End of StoreArrayInst for arr ---
-	# StoreArrayInst: STORE arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[1], 2
-	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 1 is in a register
-	# Reserved temporary register $t1
-	li $t1, 1
-	# Index value for 'arr' is in $t1
-	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
+	# --- End of call to printf ---
+	# AssignInst: testBlock = 2
 	# Ensuring operand 2 is in a register
-	# Reserved temporary register $t4
-	li $t4, 2
-	# Value to store in 'arr[index]' is in $t4
-	sw $t4, 0($t0)
-	# Stored value from $t4 into 'arr[index]'
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
-	# Released temporary register $t0
-	# --- End of StoreArrayInst for arr ---
-	# StoreArrayInst: STORE arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[2], 3
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 2 is in a register
-	# Reserved temporary register $t1
-	li $t1, 2
-	# Index value for 'arr' is in $t1
-	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Ensuring operand 3 is in a register
-	# Reserved temporary register $t4
-	li $t4, 3
-	# Value to store in 'arr[index]' is in $t4
-	sw $t4, 0($t0)
-	# Stored value from $t4 into 'arr[index]'
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	li $t0, 2
+	sw $t0, -100($fp)
+	# Stored to local testBlock at -100($fp)
 	# Released temporary register $t0
-	# --- End of StoreArrayInst for arr ---
-	# StoreArrayInst: STORE arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[3], 0
+	# --- Calling function: printf ---
+	# Ensuring operand label _S0 is in a register
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 3 is in a register
+	la $t0, _S0
+	# Loaded address of label _S0 into $t0
+	move $a0, $t0
+	# Ensuring operand testBlock:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 3
-	# Index value for 'arr' is in $t1
+	lw $t1, -100($fp)
+	# Loaded local var testBlock from -100($fp) into $t1
+	move $a1, $t1
+	jal printf
+	nop
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# --- End of call to printf ---
+	# AssignInst: testBlock = 3
+	# Ensuring operand 3 is in a register
+	# Reserved temporary register $t0
+	li $t0, 3
+	sw $t0, -100($fp)
+	# Stored to local testBlock at -100($fp)
+	# Released temporary register $t0
+	# --- Calling function: printf ---
+	# Ensuring operand label _S0 is in a register
+	# Reserved temporary register $t0
+	la $t0, _S0
+	# Loaded address of label _S0 into $t0
+	move $a0, $t0
+	# Ensuring operand testBlock:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -100($fp)
+	# Loaded local var testBlock from -100($fp) into $t1
+	move $a1, $t1
+	jal printf
+	nop
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# --- End of call to printf ---
+	# AssignInst: d = 10
+	# Ensuring operand 10 is in a register
+	# Reserved temporary register $t0
+	li $t0, 10
+	sw $t0, -88($fp)
+	# Stored to local d at -88($fp)
+	# Released temporary register $t0
+	# AssignInst: e = 9
+	# Ensuring operand 9 is in a register
+	# Reserved temporary register $t0
+	li $t0, 9
+	sw $t0, -92($fp)
+	# Stored to local e at -92($fp)
+	# Released temporary register $t0
+	# AssignInst: f = 8
+	# Ensuring operand 8 is in a register
+	# Reserved temporary register $t0
+	li $t0, 8
+	sw $t0, -96($fp)
+	# Stored to local f at -96($fp)
+	# Released temporary register $t0
+	# CallPureInst: CALL_PURE __builtin_add_int(d:INTEGER, e:INTEGER) -> (%tmp_addsub_0:INTEGER)
+	# Ensuring operand d:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var d from -88($fp) into $t0
+	# Ensuring operand e:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -92($fp)
+	# Loaded local var e from -92($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
+	addu $t2, $t0, $t1
+	sw $t2, -4($fp)
+	# Stored result of pure call to local %tmp_addsub_0 at -4($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_add_int(%tmp_addsub_0:INTEGER, f:INTEGER) -> (%tmp_addsub_1:INTEGER)
+	# Ensuring operand %tmp_addsub_0:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -4($fp)
+	# Loaded local var %tmp_addsub_0 from -4($fp) into $t0
+	# Ensuring operand f:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var f from -96($fp) into $t1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -8($fp)
+	# Stored result of pure call to local %tmp_addsub_1 at -8($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_sub_int(0, d:INTEGER) -> (%tmp_uneg_2:INTEGER)
 	# Ensuring operand 0 is in a register
-	# Reserved temporary register $t4
-	li $t4, 0
-	# Value to store in 'arr[index]' is in $t4
-	sw $t4, 0($t0)
-	# Stored value from $t4 into 'arr[index]'
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
-	# Released temporary register $t0
-	# --- End of StoreArrayInst for arr ---
-	# StoreArrayInst: STORE arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[4], 5
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 4 is in a register
+	li $t0, 0
+	# Ensuring operand d:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 4
-	# Index value for 'arr' is in $t1
+	lw $t1, -88($fp)
+	# Loaded local var d from -88($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Ensuring operand 5 is in a register
-	# Reserved temporary register $t4
-	li $t4, 5
-	# Value to store in 'arr[index]' is in $t4
-	sw $t4, 0($t0)
-	# Stored value from $t4 into 'arr[index]'
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	subu $t2, $t0, $t1
+	sw $t2, -80($fp)
+	# Stored result of pure call to local %tmp_uneg_2 at -80($fp)
 	# Released temporary register $t0
-	# --- End of StoreArrayInst for arr ---
-	# StoreArrayInst: STORE arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[5], 6
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_sub_int(%tmp_uneg_2:INTEGER, e:INTEGER) -> (%tmp_addsub_3:INTEGER)
+	# Ensuring operand %tmp_uneg_2:INTEGER is in a register
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 5 is in a register
+	lw $t0, -80($fp)
+	# Loaded local var %tmp_uneg_2 from -80($fp) into $t0
+	# Ensuring operand e:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 5
-	# Index value for 'arr' is in $t1
+	lw $t1, -92($fp)
+	# Loaded local var e from -92($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Ensuring operand 6 is in a register
-	# Reserved temporary register $t4
-	li $t4, 6
-	# Value to store in 'arr[index]' is in $t4
-	sw $t4, 0($t0)
-	# Stored value from $t4 into 'arr[index]'
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	subu $t2, $t0, $t1
+	sw $t2, -28($fp)
+	# Stored result of pure call to local %tmp_addsub_3 at -28($fp)
 	# Released temporary register $t0
-	# --- End of StoreArrayInst for arr ---
-	# StoreArrayInst: STORE arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[3], 4
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_sub_int(%tmp_addsub_3:INTEGER, f:INTEGER) -> (%tmp_addsub_4:INTEGER)
+	# Ensuring operand %tmp_addsub_3:INTEGER is in a register
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 3 is in a register
+	lw $t0, -28($fp)
+	# Loaded local var %tmp_addsub_3 from -28($fp) into $t0
+	# Ensuring operand f:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 3
-	# Index value for 'arr' is in $t1
+	lw $t1, -96($fp)
+	# Loaded local var f from -96($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Ensuring operand 4 is in a register
-	# Reserved temporary register $t4
-	li $t4, 4
-	# Value to store in 'arr[index]' is in $t4
-	sw $t4, 0($t0)
-	# Stored value from $t4 into 'arr[index]'
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	subu $t2, $t0, $t1
+	sw $t2, -32($fp)
+	# Stored result of pure call to local %tmp_addsub_4 at -32($fp)
 	# Released temporary register $t0
-	# --- End of StoreArrayInst for arr ---
-	# LoadArrayInst: %tmp_arr_load_1:INTEGER = LOAD arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[0]
-	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_sub_int(0, %tmp_addsub_4:INTEGER) -> (%tmp_uneg_5:INTEGER)
 	# Ensuring operand 0 is in a register
-	# Reserved temporary register $t1
-	li $t1, 0
-	# Index value for 'arr' is in $t1
-	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arr[index]' into temp reg $t4
-	sw $t4, -8($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_1' at offset -8
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
-	# Released temporary register $t0
-	# --- End of LoadArrayInst for arr ---
-	# LoadArrayInst: %tmp_arr_load_2:INTEGER = LOAD arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[1]
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 1 is in a register
+	li $t0, 0
+	# Ensuring operand %tmp_addsub_4:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 1
-	# Index value for 'arr' is in $t1
+	lw $t1, -32($fp)
+	# Loaded local var %tmp_addsub_4 from -32($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arr[index]' into temp reg $t4
-	sw $t4, -12($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_2' at offset -12
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	subu $t2, $t0, $t1
+	sw $t2, -84($fp)
+	# Stored result of pure call to local %tmp_uneg_5 at -84($fp)
 	# Released temporary register $t0
-	# --- End of LoadArrayInst for arr ---
-	# --- Calling function: printArr1 ---
-	# Ensuring operand %tmp_arr_load_1:INTEGER is in a register
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_mod_int(d:INTEGER, f:INTEGER) -> (%tmp_muldiv_6:INTEGER)
+	# Ensuring operand d:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var d from -88($fp) into $t0
+	# Ensuring operand f:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var f from -96($fp) into $t1
+	# Reserved temporary register $t2
+	div $t0, $t1
+	mfhi $t2
+	sw $t2, -64($fp)
+	# Stored result of pure call to local %tmp_muldiv_6 at -64($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_div_int(%tmp_uneg_5:INTEGER, %tmp_muldiv_6:INTEGER) -> (%tmp_muldiv_7:INTEGER)
+	# Ensuring operand %tmp_uneg_5:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -84($fp)
+	# Loaded local var %tmp_uneg_5 from -84($fp) into $t0
+	# Ensuring operand %tmp_muldiv_6:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -64($fp)
+	# Loaded local var %tmp_muldiv_6 from -64($fp) into $t1
+	# Reserved temporary register $t2
+	div $t0, $t1
+	mflo $t2
+	sw $t2, -68($fp)
+	# Stored result of pure call to local %tmp_muldiv_7 at -68($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_mul_int(%tmp_addsub_1:INTEGER, %tmp_muldiv_7:INTEGER) -> (%tmp_muldiv_8:INTEGER)
+	# Ensuring operand %tmp_addsub_1:INTEGER is in a register
 	# Reserved temporary register $t0
 	lw $t0, -8($fp)
-	# Loaded local var %tmp_arr_load_1 from -8($fp) into $t0
-	move $a0, $t0
-	# Ensuring operand %tmp_arr_load_2:INTEGER is in a register
+	# Loaded local var %tmp_addsub_1 from -8($fp) into $t0
+	# Ensuring operand %tmp_muldiv_7:INTEGER is in a register
 	# Reserved temporary register $t1
-	lw $t1, -12($fp)
-	# Loaded local var %tmp_arr_load_2 from -12($fp) into $t1
-	move $a1, $t1
-	jal printArr1
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printArr1 ---
-	# LoadArrayInst: %tmp_arr_load_3:INTEGER = LOAD arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[0]
-	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 0 is in a register
-	# Reserved temporary register $t1
-	li $t1, 0
-	# Index value for 'arr' is in $t1
+	lw $t1, -68($fp)
+	# Loaded local var %tmp_muldiv_7 from -68($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arr[index]' into temp reg $t4
-	sw $t4, -16($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_3' at offset -16
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -72($fp)
+	# Stored result of pure call to local %tmp_muldiv_8 at -72($fp)
 	# Released temporary register $t0
-	# --- End of LoadArrayInst for arr ---
-	# LoadArrayInst: %tmp_arr_load_4:INTEGER = LOAD arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[1]
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: a = %tmp_muldiv_8:INTEGER
+	# Ensuring operand %tmp_muldiv_8:INTEGER is in a register
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 1 is in a register
+	lw $t0, -72($fp)
+	# Loaded local var %tmp_muldiv_8 from -72($fp) into $t0
 	# Reserved temporary register $t1
-	li $t1, 1
-	# Index value for 'arr' is in $t1
-	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arr[index]' into temp reg $t4
-	sw $t4, -20($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_4' at offset -20
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
+	la $t1, a
+	sw $t0, 0($t1)
 	# Released temporary register $t1
+	# Stored to global a
 	# Released temporary register $t0
-	# --- End of LoadArrayInst for arr ---
-	# LoadArrayInst: %tmp_arr_load_5:INTEGER = LOAD arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[2]
-	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
+	# CallPureInst: CALL_PURE __builtin_mul_int(2, f:INTEGER) -> (%tmp_muldiv_9:INTEGER)
 	# Ensuring operand 2 is in a register
+	# Reserved temporary register $t0
+	li $t0, 2
+	# Ensuring operand f:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 2
-	# Index value for 'arr' is in $t1
+	lw $t1, -96($fp)
+	# Loaded local var f from -96($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arr[index]' into temp reg $t4
-	sw $t4, -24($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_5' at offset -24
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -76($fp)
+	# Stored result of pure call to local %tmp_muldiv_9 at -76($fp)
 	# Released temporary register $t0
-	# --- End of LoadArrayInst for arr ---
-	# LoadArrayInst: %tmp_arr_load_6:INTEGER = LOAD arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[3]
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_mul_int(2, %tmp_muldiv_9:INTEGER) -> (%tmp_muldiv_10:INTEGER)
+	# Ensuring operand 2 is in a register
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 3 is in a register
+	li $t0, 2
+	# Ensuring operand %tmp_muldiv_9:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 3
-	# Index value for 'arr' is in $t1
+	lw $t1, -76($fp)
+	# Loaded local var %tmp_muldiv_9 from -76($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arr[index]' into temp reg $t4
-	sw $t4, -28($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_6' at offset -28
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -36($fp)
+	# Stored result of pure call to local %tmp_muldiv_10 at -36($fp)
 	# Released temporary register $t0
-	# --- End of LoadArrayInst for arr ---
-	# LoadArrayInst: %tmp_arr_load_7:INTEGER = LOAD arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[4]
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_mul_int(2, %tmp_muldiv_10:INTEGER) -> (%tmp_muldiv_11:INTEGER)
+	# Ensuring operand 2 is in a register
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 4 is in a register
+	li $t0, 2
+	# Ensuring operand %tmp_muldiv_10:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 4
-	# Index value for 'arr' is in $t1
+	lw $t1, -36($fp)
+	# Loaded local var %tmp_muldiv_10 from -36($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arr[index]' into temp reg $t4
-	sw $t4, -32($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_7' at offset -32
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
-	# Released temporary register $t1
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -40($fp)
+	# Stored result of pure call to local %tmp_muldiv_11 at -40($fp)
 	# Released temporary register $t0
-	# --- End of LoadArrayInst for arr ---
-	# LoadArrayInst: %tmp_arr_load_8:INTEGER = LOAD arr:ARRAY(dims=1, sizes=[6], type=INTEGER)[5]
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_mul_int(2, %tmp_muldiv_11:INTEGER) -> (%tmp_muldiv_12:INTEGER)
+	# Ensuring operand 2 is in a register
 	# Reserved temporary register $t0
-	addiu $t0, $fp, -60
-	# Calculated base address of local array 'arr' (offset -60) into $t0
-	# Ensuring operand 5 is in a register
+	li $t0, 2
+	# Ensuring operand %tmp_muldiv_11:INTEGER is in a register
 	# Reserved temporary register $t1
-	li $t1, 5
-	# Index value for 'arr' is in $t1
+	lw $t1, -40($fp)
+	# Loaded local var %tmp_muldiv_11 from -40($fp) into $t1
 	# Reserved temporary register $t2
-	li $t2, 4
-	# Reserved temporary register $t3
-	multu $t1, $t2
-	mflo $t3
-	# Calculated offset_in_bytes ($t1 * 4) into $t3
-	addu $t0, $t0, $t3
-	# Calculated final element address for 'arr[index]' into $t0
-	# Reserved temporary register $t4
-	lw $t4, 0($t0)
-	# Loaded value from 'arr[index]' into temp reg $t4
-	sw $t4, -36($fp)
-	# Stored loaded array element to local destination '%tmp_arr_load_8' at offset -36
-	# Released temporary register $t4
-	# Released temporary register $t3
-	# Released temporary register $t2
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -44($fp)
+	# Stored result of pure call to local %tmp_muldiv_12 at -44($fp)
+	# Released temporary register $t0
 	# Released temporary register $t1
-	# Released temporary register $t0
-	# --- End of LoadArrayInst for arr ---
-	# --- Calling function: printArr2 ---
-	# Ensuring operand %tmp_arr_load_8:INTEGER is in a register
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_mul_int(2, %tmp_muldiv_12:INTEGER) -> (%tmp_muldiv_13:INTEGER)
+	# Ensuring operand 2 is in a register
 	# Reserved temporary register $t0
-	lw $t0, -36($fp)
-	# Loaded local var %tmp_arr_load_8 from -36($fp) into $t0
-	addiu $sp, $sp, -4
-	sw $t0, 0($sp)
-	# Pushed argument 6 onto stack
+	li $t0, 2
+	# Ensuring operand %tmp_muldiv_12:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -44($fp)
+	# Loaded local var %tmp_muldiv_12 from -44($fp) into $t1
+	# Reserved temporary register $t2
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -48($fp)
+	# Stored result of pure call to local %tmp_muldiv_13 at -48($fp)
 	# Released temporary register $t0
-	# Ensuring operand %tmp_arr_load_7:INTEGER is in a register
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: b = %tmp_muldiv_13:INTEGER
+	# Ensuring operand %tmp_muldiv_13:INTEGER is in a register
 	# Reserved temporary register $t0
-	lw $t0, -32($fp)
-	# Loaded local var %tmp_arr_load_7 from -32($fp) into $t0
-	addiu $sp, $sp, -4
-	sw $t0, 0($sp)
-	# Pushed argument 5 onto stack
+	lw $t0, -48($fp)
+	# Loaded local var %tmp_muldiv_13 from -48($fp) into $t0
+	# Reserved temporary register $t1
+	la $t1, b
+	sw $t0, 0($t1)
+	# Released temporary register $t1
+	# Stored to global b
 	# Released temporary register $t0
-	# Ensuring operand %tmp_arr_load_3:INTEGER is in a register
+	# CallPureInst: CALL_PURE __builtin_mul_int(b:INTEGER, c:INTEGER) -> (%tmp_muldiv_14:INTEGER)
+	# Ensuring operand b:INTEGER is in a register
+	# Reserved temporary register $t0
+	la $t0, b
+	lw $t0, 0($t0)
+	# Loaded global var b into $t0
+	# Ensuring operand c:INTEGER is in a register
+	# Reserved temporary register $t1
+	la $t1, c
+	lw $t1, 0($t1)
+	# Loaded global var c into $t1
+	# Reserved temporary register $t2
+	multu $t0, $t1
+	mflo $t2
+	sw $t2, -52($fp)
+	# Stored result of pure call to local %tmp_muldiv_14 at -52($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_add_int(a:INTEGER, %tmp_muldiv_14:INTEGER) -> (%tmp_addsub_15:INTEGER)
+	# Ensuring operand a:INTEGER is in a register
+	# Reserved temporary register $t0
+	la $t0, a
+	lw $t0, 0($t0)
+	# Loaded global var a into $t0
+	# Ensuring operand %tmp_muldiv_14:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -52($fp)
+	# Loaded local var %tmp_muldiv_14 from -52($fp) into $t1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -12($fp)
+	# Stored result of pure call to local %tmp_addsub_15 at -12($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_div_int(d:INTEGER, e:INTEGER) -> (%tmp_muldiv_16:INTEGER)
+	# Ensuring operand d:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -88($fp)
+	# Loaded local var d from -88($fp) into $t0
+	# Ensuring operand e:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -92($fp)
+	# Loaded local var e from -92($fp) into $t1
+	# Reserved temporary register $t2
+	div $t0, $t1
+	mflo $t2
+	sw $t2, -56($fp)
+	# Stored result of pure call to local %tmp_muldiv_16 at -56($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_mod_int(%tmp_muldiv_16:INTEGER, f:INTEGER) -> (%tmp_muldiv_17:INTEGER)
+	# Ensuring operand %tmp_muldiv_16:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -56($fp)
+	# Loaded local var %tmp_muldiv_16 from -56($fp) into $t0
+	# Ensuring operand f:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -96($fp)
+	# Loaded local var f from -96($fp) into $t1
+	# Reserved temporary register $t2
+	div $t0, $t1
+	mfhi $t2
+	sw $t2, -60($fp)
+	# Stored result of pure call to local %tmp_muldiv_17 at -60($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# CallPureInst: CALL_PURE __builtin_sub_int(%tmp_addsub_15:INTEGER, %tmp_muldiv_17:INTEGER) -> (%tmp_addsub_18:INTEGER)
+	# Ensuring operand %tmp_addsub_15:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -12($fp)
+	# Loaded local var %tmp_addsub_15 from -12($fp) into $t0
+	# Ensuring operand %tmp_muldiv_17:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -60($fp)
+	# Loaded local var %tmp_muldiv_17 from -60($fp) into $t1
+	# Reserved temporary register $t2
+	subu $t2, $t0, $t1
+	sw $t2, -16($fp)
+	# Stored result of pure call to local %tmp_addsub_18 at -16($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# AssignInst: c = %tmp_addsub_18:INTEGER
+	# Ensuring operand %tmp_addsub_18:INTEGER is in a register
 	# Reserved temporary register $t0
 	lw $t0, -16($fp)
-	# Loaded local var %tmp_arr_load_3 from -16($fp) into $t0
-	move $a0, $t0
-	# Ensuring operand %tmp_arr_load_4:INTEGER is in a register
+	# Loaded local var %tmp_addsub_18 from -16($fp) into $t0
 	# Reserved temporary register $t1
-	lw $t1, -20($fp)
-	# Loaded local var %tmp_arr_load_4 from -20($fp) into $t1
-	move $a1, $t1
-	# Ensuring operand %tmp_arr_load_5:INTEGER is in a register
+	la $t1, c
+	sw $t0, 0($t1)
+	# Released temporary register $t1
+	# Stored to global c
+	# Released temporary register $t0
+	# CallPureInst: CALL_PURE __builtin_add_int(a:INTEGER, b:INTEGER) -> (%tmp_addsub_19:INTEGER)
+	# Ensuring operand a:INTEGER is in a register
+	# Reserved temporary register $t0
+	la $t0, a
+	lw $t0, 0($t0)
+	# Loaded global var a into $t0
+	# Ensuring operand b:INTEGER is in a register
+	# Reserved temporary register $t1
+	la $t1, b
+	lw $t1, 0($t1)
+	# Loaded global var b into $t1
 	# Reserved temporary register $t2
-	lw $t2, -24($fp)
-	# Loaded local var %tmp_arr_load_5 from -24($fp) into $t2
-	move $a2, $t2
-	# Ensuring operand %tmp_arr_load_6:INTEGER is in a register
-	# Reserved temporary register $t3
-	lw $t3, -28($fp)
-	# Loaded local var %tmp_arr_load_6 from -28($fp) into $t3
-	move $a3, $t3
-	jal printArr2
-	nop
-	addiu $sp, $sp, 8
-	# Cleaned up 2 stack arguments
+	addu $t2, $t0, $t1
+	sw $t2, -20($fp)
+	# Stored result of pure call to local %tmp_addsub_19 at -20($fp)
 	# Released temporary register $t0
 	# Released temporary register $t1
 	# Released temporary register $t2
-	# Released temporary register $t3
-	# --- End of call to printArr2 ---
+	# CallPureInst: CALL_PURE __builtin_add_int(%tmp_addsub_19:INTEGER, c:INTEGER) -> (%tmp_addsub_20:INTEGER)
+	# Ensuring operand %tmp_addsub_19:INTEGER is in a register
+	# Reserved temporary register $t0
+	lw $t0, -20($fp)
+	# Loaded local var %tmp_addsub_19 from -20($fp) into $t0
+	# Ensuring operand c:INTEGER is in a register
+	# Reserved temporary register $t1
+	la $t1, c
+	lw $t1, 0($t1)
+	# Loaded global var c into $t1
+	# Reserved temporary register $t2
+	addu $t2, $t0, $t1
+	sw $t2, -24($fp)
+	# Stored result of pure call to local %tmp_addsub_20 at -24($fp)
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# Released temporary register $t2
+	# --- Calling function: printf ---
+	# Ensuring operand label _S0 is in a register
+	# Reserved temporary register $t0
+	la $t0, _S0
+	# Loaded address of label _S0 into $t0
+	move $a0, $t0
+	# Ensuring operand %tmp_addsub_20:INTEGER is in a register
+	# Reserved temporary register $t1
+	lw $t1, -24($fp)
+	# Loaded local var %tmp_addsub_20 from -24($fp) into $t1
+	move $a1, $t1
+	jal printf
+	nop
+	# Released temporary register $t0
+	# Released temporary register $t1
+	# --- End of call to printf ---
 	# Ensuring operand 0 is in a register
 	# Reserved temporary register $t0
 	li $t0, 0
@@ -631,204 +623,19 @@ main_epilogue:
 	# Epilogue for main
 	lw $ra, 4($fp)
 	lw $fp, 0($fp)
-	addiu $sp, $sp, 68
-	jr $ra
-	nop
-	# Parameter 'v0' assigned stack offset: -4($fp)
-	# Parameter 'v1' assigned stack offset: -8($fp)
-	# Function printArr1: totalLocalVarSize = -8, frameSize = 16
-printArr1:
-	# Prologue for printArr1
-	addiu $sp, $sp, -16
-	sw $ra, 12($sp)
-	sw $fp, 8($sp)
-	addiu $fp, $sp, 8
-	sw $a0, -4($fp)
-	# Stored $a0 (param 'v0') to -4($fp)
-	sw $a1, -8($fp)
-	# Stored $a1 (param 'v1') to -8($fp)
-	# --- Calling function: printf ---
-	# Ensuring operand label _S0 is in a register
-	# Reserved temporary register $t0
-	la $t0, _S0
-	# Loaded address of label _S0 into $t0
-	move $a0, $t0
-	# Ensuring operand v0:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -4($fp)
-	# Loaded local var v0 from -4($fp) into $t1
-	move $a1, $t1
-	jal printf
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printf ---
-	# --- Calling function: printf ---
-	# Ensuring operand label _S1 is in a register
-	# Reserved temporary register $t0
-	la $t0, _S1
-	# Loaded address of label _S1 into $t0
-	move $a0, $t0
-	# Ensuring operand v1:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -8($fp)
-	# Loaded local var v1 from -8($fp) into $t1
-	move $a1, $t1
-	jal printf
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printf ---
-printArr1_epilogue:
-	# Epilogue for printArr1
-	lw $ra, 4($fp)
-	lw $fp, 0($fp)
-	addiu $sp, $sp, 16
-	jr $ra
-	nop
-	# Parameter 'v00' assigned stack offset: -4($fp)
-	# Parameter 'v01' assigned stack offset: -8($fp)
-	# Parameter 'v10' assigned stack offset: -12($fp)
-	# Parameter 'v11' assigned stack offset: -16($fp)
-	# Parameter 'v20' assigned stack offset: -20($fp)
-	# Parameter 'v21' assigned stack offset: -24($fp)
-	# Function printArr2: totalLocalVarSize = -24, frameSize = 32
-printArr2:
-	# Prologue for printArr2
-	addiu $sp, $sp, -32
-	sw $ra, 28($sp)
-	sw $fp, 24($sp)
-	addiu $fp, $sp, 24
-	sw $a0, -4($fp)
-	# Stored $a0 (param 'v00') to -4($fp)
-	sw $a1, -8($fp)
-	# Stored $a1 (param 'v01') to -8($fp)
-	sw $a2, -12($fp)
-	# Stored $a2 (param 'v10') to -12($fp)
-	sw $a3, -16($fp)
-	# Stored $a3 (param 'v11') to -16($fp)
-	lw $t0, 8($fp)
-	sw $t0, -20($fp)
-	# Loaded stack param 'v20' from 8($fp) to -20($fp)
-	lw $t0, 12($fp)
-	sw $t0, -24($fp)
-	# Loaded stack param 'v21' from 12($fp) to -24($fp)
-	# --- Calling function: printf ---
-	# Ensuring operand label _S2 is in a register
-	# Reserved temporary register $t0
-	la $t0, _S2
-	# Loaded address of label _S2 into $t0
-	move $a0, $t0
-	# Ensuring operand v00:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -4($fp)
-	# Loaded local var v00 from -4($fp) into $t1
-	move $a1, $t1
-	jal printf
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printf ---
-	# --- Calling function: printf ---
-	# Ensuring operand label _S3 is in a register
-	# Reserved temporary register $t0
-	la $t0, _S3
-	# Loaded address of label _S3 into $t0
-	move $a0, $t0
-	# Ensuring operand v01:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -8($fp)
-	# Loaded local var v01 from -8($fp) into $t1
-	move $a1, $t1
-	jal printf
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printf ---
-	# --- Calling function: printf ---
-	# Ensuring operand label _S4 is in a register
-	# Reserved temporary register $t0
-	la $t0, _S4
-	# Loaded address of label _S4 into $t0
-	move $a0, $t0
-	# Ensuring operand v10:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -12($fp)
-	# Loaded local var v10 from -12($fp) into $t1
-	move $a1, $t1
-	jal printf
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printf ---
-	# --- Calling function: printf ---
-	# Ensuring operand label _S5 is in a register
-	# Reserved temporary register $t0
-	la $t0, _S5
-	# Loaded address of label _S5 into $t0
-	move $a0, $t0
-	# Ensuring operand v11:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -16($fp)
-	# Loaded local var v11 from -16($fp) into $t1
-	move $a1, $t1
-	jal printf
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printf ---
-	# --- Calling function: printf ---
-	# Ensuring operand label _S6 is in a register
-	# Reserved temporary register $t0
-	la $t0, _S6
-	# Loaded address of label _S6 into $t0
-	move $a0, $t0
-	# Ensuring operand v20:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -20($fp)
-	# Loaded local var v20 from -20($fp) into $t1
-	move $a1, $t1
-	jal printf
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printf ---
-	# --- Calling function: printf ---
-	# Ensuring operand label _S7 is in a register
-	# Reserved temporary register $t0
-	la $t0, _S7
-	# Loaded address of label _S7 into $t0
-	move $a0, $t0
-	# Ensuring operand v21:INTEGER is in a register
-	# Reserved temporary register $t1
-	lw $t1, -24($fp)
-	# Loaded local var v21 from -24($fp) into $t1
-	move $a1, $t1
-	jal printf
-	nop
-	# Released temporary register $t0
-	# Released temporary register $t1
-	# --- End of call to printf ---
-printArr2_epilogue:
-	# Epilogue for printArr2
-	lw $ra, 4($fp)
-	lw $fp, 0($fp)
-	addiu $sp, $sp, 32
+	addiu $sp, $sp, 108
 	jr $ra
 	nop
 
 .data
 _newline: .asciiz "\n"
 # Global Variables
-arrc: .word 1, 2, 3, 4, 5, 6 # Array: 6 elements, initialized
+Pai: .word 3
+a: .space 4
+b: .space 4
+c: .space 4
+testBlock: .word 1
 
 # String Literals
-_S0: .asciiz "arr[0]:%d\n"
-_S1: .asciiz "arr[1]:%d\n"
-_S2: .asciiz "arr[0][0]:%d\n"
-_S3: .asciiz "arr[0][1]:%d\n"
-_S4: .asciiz "arr[1][0]:%d\n"
-_S5: .asciiz "arr[1][1]:%d\n"
-_S6: .asciiz "arr[2][0]:%d\n"
-_S7: .asciiz "arr[2][1]:%d\n"
+_S0: .asciiz "%d\n"
 

@@ -147,7 +147,7 @@ void IRGenerator::visitFuncDef(PNNode node) {
         return;
     } else {
         std::cerr << "[IR_GEN] visitFuncDef: Visiting block node: " << block_node->name << " for function '" << func_name << "'." << std::endl;
-        visitBlock(block_node, false);
+        visitBlock(block_node, true);  // Change false to true to create new scope for function body
     }
 
     symbolTable.leaveScope();
@@ -863,10 +863,7 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitFunctionCall(PTNode idNode, PNN
     // std::optional<std::shared_ptr<IR::IRVariable>> result_destination = std::nullopt;
     std::shared_ptr<IR::IRVariable> result_destination = nullptr;
     std::shared_ptr<IR::IRType> expected_call_ret_type = nullptr;
-    bool is_normal_call = false;
-
     if (this->program->normalFunctions.count(func_name)) {
-        is_normal_call = true;
         auto target_func = this->program->normalFunctions.at(func_name);
         expected_call_ret_type = target_func->returnType;
         std::cerr << "[IR_GEN] Function '" << func_name << "' is a Normal Function. Return type: " << (expected_call_ret_type ? expected_call_ret_type->toString() : "null_type") << std::endl;
@@ -1020,7 +1017,7 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitPrimaryExp(PNNode node) {
         } else if (auto t_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
             child_info_str = "TerminalNode(token: " + (t_child->token ? t_child->token->matched : "<no_token>") + ")";
         } else {
-            child_info_str = "UnknownChildNodeType(typeid: " + std::string(typeid(*first_child_base).name()) + ")";
+            child_info_str = "UnknownChildNodeType(typeid: " + std::string(typeid((void)*first_child_base).name()) + ")";
         }
     }
     std::cerr << "[IR_GEN_ERR] visitPrimaryExp: Unsupported PrimaryExp structure. Node: " << (node ? node->name : "null_node")
@@ -1130,7 +1127,7 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitUnaryExp(PNNode node) {
         } else if (auto t_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
             child_info_for_log = "TerminalNode(token: " + (t_child->token ? t_child->token->matched : "<no_token>") + ")";
         } else {
-            child_info_for_log = "UnknownChildNodeType(typeid_name: " + std::string(typeid(*first_child_base).name()) + ")";
+            child_info_for_log = "UnknownChildNodeType(typeid_name: " + std::string(typeid((void)*first_child_base).name()) + ")";
         }
     }
     std::cerr << "[IR_GEN_ERR] visitUnaryExp: Unhandled UnaryExp structure. First child details: " << child_info_for_log << std::endl;
@@ -1430,7 +1427,7 @@ std::shared_ptr<IR::IROperand> IRGenerator::dispatchVisitExp(PNode node_base) {
 
     std::cerr << "[IR_GEN] dispatchVisitExp: Node type not recognized for dispatch. node_base is " << (node_base ? "valid_ptr" : "nullptr") << ".";
     if (node_base) {
-        std::cerr << " TypeID: " << typeid(*node_base).name();
+        std::cerr << " TypeID: " << typeid((void)*node_base).name();
     }
     std::cerr << std::endl;
     return nullptr;
@@ -1529,7 +1526,7 @@ void IRGenerator::dispatchVisit(PNode node_base) {
     auto node = std::dynamic_pointer_cast<AST::NonTerminalNode>(node_base);
     if (!node) {
         if (node_base) {
-            std::cerr << "[IR_GEN] dispatchVisit() called with TerminalNode or unknown node type. TypeID: " << typeid(*node_base).name() << std::endl;
+            std::cerr << "[IR_GEN] dispatchVisit() called with TerminalNode or unknown node type. TypeID: " << typeid((void)*node_base).name() << std::endl;
         } else {
             std::cerr << "[IR_GEN] dispatchVisit() called with null" << std::endl;
         }
@@ -1699,7 +1696,7 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
             if (initializer_node) {
                 if (is_array_decl) { 
                     std::cerr << "[IR_GEN] visitDecl: Processing array initializer for '" << var_name << "'." << std::endl;
-                    std::cerr << "[IR_GEN] visitDecl: initializer_node type: " << (initializer_node ? typeid(*initializer_node).name() : "null") << std::endl;
+                    std::cerr << "[IR_GEN] visitDecl: initializer_node type: " << (initializer_node ? typeid((void)*initializer_node).name() : "null") << std::endl;
                     
                     // Parse array initializer list directly (don't use dispatchVisitExp for InitVal)
                     auto init_nnode = std::dynamic_pointer_cast<AST::NonTerminalNode>(initializer_node);
@@ -2336,6 +2333,7 @@ void IRGenerator::visitWhileStmt(PNNode node) {
 }
 
 void IRGenerator::visitBreakStmt(PNNode node) {
+    (void)node; // Parameter not used but kept for interface consistency
     std::cerr << "[IR_GEN] visitBreakStmt() called." << std::endl;
     if (loopLabelStack.empty()) {
         std::cerr << "[IR_GEN_ERR] visitBreakStmt: Break statement found outside of a loop." << std::endl;
@@ -2349,6 +2347,7 @@ void IRGenerator::visitBreakStmt(PNNode node) {
 }
 
 void IRGenerator::visitContinueStmt(PNNode node) {
+    (void)node; // Parameter not used but kept for interface consistency
     std::cerr << "[IR_GEN] visitContinueStmt() called." << std::endl;
     if (loopLabelStack.empty()) {
         std::cerr << "[IR_GEN_ERR] visitContinueStmt: Continue statement found outside of a loop." << std::endl;

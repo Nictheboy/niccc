@@ -65,7 +65,6 @@ void MipsCodeGenerator::generateProgram(std::shared_ptr<IR::IRProgram> irProgram
             std::shared_ptr<IR::IRVariable> var = pair.second;
             
             if (auto array_type = std::dynamic_pointer_cast<IR::ArrayIRType>(var->type)) {
-                int element_size = 4; // Assuming int elements for now
                 int total_elements = array_type->getTotalElementCount();
                 if (total_elements <= 0) {
                     // This might happen if dimension parsing failed or was 0
@@ -672,7 +671,13 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::AssignInst> inst) {
     std::string src_reg = currentFunctionContext->ensureOperandInRegister(inst->source);
     std::shared_ptr<IR::IRVariable> dest_var = inst->dest;
 
-    if (currentProgram->globalVariables.count(dest_var->name)) {
+    // Check if it's a local variable or parameter first (local scope should override global scope)
+    if (currentFunctionContext->varLocations.count(dest_var->name)) {
+        // Destination is a local variable (or parameter on stack)
+        int offset = currentFunctionContext->getVarStackOffset(dest_var->name);
+        emit("sw " + src_reg + ", " + std::to_string(offset) + "($fp)");
+        emit("# Stored to local " + dest_var->name + " at " + std::to_string(offset) + "($fp)");
+    } else if (currentProgram->globalVariables.count(dest_var->name)) {
         // Destination is a global variable
         std::string dest_addr_reg = currentFunctionContext->reserveRegister();  // Temp for address
         emit("la " + dest_addr_reg + ", " + dest_var->name);
@@ -680,10 +685,7 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::AssignInst> inst) {
         currentFunctionContext->releaseRegister(dest_addr_reg);
         emit("# Stored to global " + dest_var->name);
     } else {
-        // Destination is a local variable (or parameter on stack)
-        int offset = currentFunctionContext->getVarStackOffset(dest_var->name);
-        emit("sw " + src_reg + ", " + std::to_string(offset) + "($fp)");
-        emit("# Stored to local " + dest_var->name + " at " + std::to_string(offset) + "($fp)");
+        emit("# ERROR: Variable " + dest_var->name + " not found in local varLocations or global variables during AssignInst.");
     }
 
     currentFunctionContext->releaseRegister(src_reg);  // Release register used for source
@@ -702,6 +704,7 @@ void MipsCodeGenerator::translateBuiltinSub(const std::string& destReg, const st
 // --- Register Management and Memory Access ---
 // These are mostly delegated to MipsFunctionContext but might have stubs or direct calls here
 std::string MipsCodeGenerator::getOperandRegister(std::shared_ptr<IR::IROperand> operand, bool needsLoading) {
+    (void)needsLoading; // Parameter not used but kept for interface consistency
     if (!currentFunctionContext)
         return "$zero";  // Should not happen
     return currentFunctionContext->ensureOperandInRegister(operand);
@@ -710,7 +713,7 @@ std::string MipsCodeGenerator::getOperandRegister(std::shared_ptr<IR::IROperand>
 // --- MipsFunctionContext Class Implementation ---
 
 MipsFunctionContext::MipsFunctionContext(std::shared_ptr<IR::NormalIRFunction> func, MipsCodeGenerator* gen)
-    : irFunction(func), generator(gen), totalLocalVarSize(0), frameSize(0) {
+    : irFunction(func), generator(gen), frameSize(0), totalLocalVarSize(0) {
     if (!irFunction) {
         // Handle error or return, as context is invalid without a function
         return;
@@ -904,6 +907,7 @@ const std::vector<std::string> MipsFunctionContext::tempRegs = {
 };
 
 std::string MipsFunctionContext::reserveRegister(std::shared_ptr<IR::IRVariable> var_for_reg) {
+    (void)var_for_reg; // Parameter not used but kept for interface consistency
     for (const std::string& reg : tempRegs) {
         if (usedRegisters.find(reg) == usedRegisters.end()) {
             usedRegisters.insert(reg);
