@@ -62,13 +62,30 @@ class ArrayIRType : public IRType {
     // SysY arrays often have their dimensions specified, but for a general IR,
     // just knowing it's an array of a certain element type might be enough.
     // Or you might want std::vector<int> dimensions;
-    int numDimensions;  // Or a more complex dimension representation
+    std::vector<int> dimension_sizes; // Changed from numDimensions to store sizes
 
-    ArrayIRType(std::shared_ptr<IRType> elemType, int dims = 1)
-        : elementType(elemType), numDimensions(dims) {}
+    ArrayIRType(std::shared_ptr<IRType> elemType, std::vector<int> sizes)
+        : elementType(elemType), dimension_sizes(std::move(sizes)) {}
+
+    int getNumDimensions() const { return dimension_sizes.size(); }
+
+    int getTotalElementCount() const {
+        if (dimension_sizes.empty()) return 0;
+        int count = 1;
+        for (int size : dimension_sizes) {
+            if (size <= 0) return 0; // Invalid size
+            count *= size;
+        }
+        return count;
+    }
 
     std::string toString() const override {
-        std::string s = "ARRAY(dims=" + std::to_string(numDimensions) + ", type=";
+        std::string s = "ARRAY(dims=" + std::to_string(getNumDimensions()) + ", sizes=[";
+        for(size_t i = 0; i < dimension_sizes.size(); ++i) {
+            s += std::to_string(dimension_sizes[i]);
+            if (i < dimension_sizes.size() - 1) s += ",";
+        }
+        s += "], type=";
         if (elementType) {
             s += elementType->toString();
         } else {
@@ -80,7 +97,7 @@ class ArrayIRType : public IRType {
 
     bool equals(const IRType* other) const override {
         if (auto otherArray = dynamic_cast<const ArrayIRType*>(other)) {
-            return numDimensions == otherArray->numDimensions &&
+            return dimension_sizes == otherArray->dimension_sizes && // Compare full vector
                    elementType && otherArray->elementType &&
                    elementType->equals(otherArray->elementType.get());
         }

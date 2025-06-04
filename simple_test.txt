@@ -1,0 +1,19 @@
+const int ArrLen = 1;
+int arr[ArrLen];
+
+int main() {
+    int len = 1;
+    int i = 0;
+    while (i < len) {
+        arr[i] = getint();
+        i = i + 1;
+    }
+    
+    i = 0;
+    while (i < len) {
+        printf("arr[%d] = %d\n", i, arr[i]);
+        i = i + 1;
+    }
+    
+    return 0;
+} 

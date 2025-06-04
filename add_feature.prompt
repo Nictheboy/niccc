@@ -1,6 +1,8 @@
-现在在中我有一个非常基本的编译器，代码可以在中看到，我希望现在在@ir_generator.cpp @mips_code_generator.cpp 中加入一些内容，来支持while continue break。需要的话也可以修改@ir_generator.hpp @mips_code_generator.hpp 
+现在在中我有一个非常基本的编译器，代码可以在中看到，我希望现在在@ir_generator.cpp @mips_code_generator.cpp 中加入一些内容，来支持全局数组变量的读写。需要的话也可以修改@ir_generator.hpp @mips_code_generator.hpp 
 
-目标是让@testfile.txt 这样的程序可以符合预期地运行。
+不要修改@ir.hpp 中对IR的定义。如果现有的IR不足以完成需要的功能，请告诉我。
+
+目标是让@testfile.txt  这样的程序可以符合预期地运行。
 
 在你认为一切完备后，可以用如下命令运行一切：
 cmake -B build/ &&  cmake  --build build/ && build/bin/niccc && cat input.txt | java  -jar ~/Downloads/Mars4_5.jar nc  mips.txt

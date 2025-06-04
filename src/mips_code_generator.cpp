@@ -63,14 +63,21 @@ void MipsCodeGenerator::generateProgram(std::shared_ptr<IR::IRProgram> irProgram
         for (const auto& pair : this->currentProgram->globalVariables) {
             const std::string& varName = pair.first;
             std::shared_ptr<IR::IRVariable> var = pair.second;
-            // Assuming all global ints are 4 bytes.
-            // SysY doesn't have global arrays in the simple case like testfile.txt
-            if (var->global_initializer_constant) {  // Check if there's a constant initializer
-                // For testfile.txt: int a = 2; const int c = 4;
+            
+            if (auto array_type = std::dynamic_pointer_cast<IR::ArrayIRType>(var->type)) {
+                int element_size = 4; // Assuming int elements for now
+                int total_elements = array_type->getTotalElementCount();
+                if (total_elements <= 0) {
+                    // This might happen if dimension parsing failed or was 0
+                    dataSegment += "# ERROR: Array '" + varName + "' has invalid size: " + std::to_string(total_elements) + "\n";
+                    dataSegment += varName + ": .space 4 # Fallback allocation for problematic array\n"; 
+                } else {
+                    dataSegment += varName + ": .space " + std::to_string(total_elements * element_size) + " # Array: " + std::to_string(total_elements) + " elements * " + std::to_string(element_size) + " bytes each\n";
+                }
+            } else if (var->global_initializer_constant) {  // Scalar with initializer
                 dataSegment += varName + ": .word " + std::to_string(var->global_initializer_constant->value) + "\n";
-            } else {
-                // For testfile.txt: int b; (uninitialized)
-                dataSegment += varName + ": .space 4\n";  // Allocate 4 bytes for an uninitialized int
+            } else { // Scalar uninitialized or other non-array type
+                dataSegment += varName + ": .space 4\n";  // Allocate 4 bytes for an uninitialized int/scalar
             }
         }
         dataSegment += "\n";
@@ -183,6 +190,10 @@ void MipsCodeGenerator::generateFunction(std::shared_ptr<IR::NormalIRFunction> n
             visit(callPureInst);
         } else if (auto condJumpInst = std::dynamic_pointer_cast<IR::CondJumpInst>(inst)) {
             visit(condJumpInst); 
+        } else if (auto loadArrayInst = std::dynamic_pointer_cast<IR::LoadArrayInst>(inst)) {
+            visit(loadArrayInst);
+        } else if (auto storeArrayInst = std::dynamic_pointer_cast<IR::StoreArrayInst>(inst)) {
+            visit(storeArrayInst);
         } else {
             emit("# Unhandled IRInstruction type in MipsCodeGenerator::generateFunction: " + inst->toString());
         }
@@ -345,7 +356,155 @@ void MipsCodeGenerator::visit(std::shared_ptr<IR::CallPureInst> inst) {
     }
 }
 
-void MipsCodeGenerator::visit(std::shared_ptr<IR::LoadArrayInst> inst) { /* ... placeholder ... */ }
+void MipsCodeGenerator::visit(std::shared_ptr<IR::LoadArrayInst> inst) {
+    if (!currentFunctionContext || !inst || !inst->arraySource || inst->indices.empty() || !inst->destination) {
+        emit("# ERROR: LoadArrayInst visited with null context, instruction, source, indices, or destination.");
+        return;
+    }
+    emit("# LoadArrayInst: " + inst->toString());
+
+    auto array_var = std::dynamic_pointer_cast<IR::IRVariable>(inst->arraySource);
+    if (!array_var) {
+        emit("# ERROR: LoadArrayInst source is not an IRVariable: " + inst->arraySource->toString());
+        return;
+    }
+
+    // 1. Get base address of the array
+    std::string base_addr_reg = currentFunctionContext->reserveRegister();
+    bool is_global_array = this->currentProgram && this->currentProgram->globalVariables.count(array_var->name);
+
+    if (is_global_array) {
+        emit("la " + base_addr_reg + ", " + array_var->name);
+        emit("# Loaded base address of global array '" + array_var->name + "' into " + base_addr_reg);
+    } else {
+        // Local array (not in testfile.txt, but for completeness)
+        // Assuming local arrays are allocated on stack and base_addr_reg will get $fp + offset
+        // This part needs more robust handling for local arrays if they are directly on stack.
+        // For now, testfile.txt uses global arrays.
+        // If local arrays were pointers to heap, this would be different.
+        // If local arrays are on stack, varLocations should give its base stack offset.
+        int offset = currentFunctionContext->getVarStackOffset(array_var->name);
+        emit("addiu " + base_addr_reg + ", $fp, " + std::to_string(offset));
+        emit("# Calculated base address of local array '" + array_var->name + "' (offset " + std::to_string(offset) + ") into " + base_addr_reg);
+    }
+
+    // 2. Get index value
+    // Assuming 1D array for testfile.txt, so inst->indices[0]
+    std::string index_val_reg = currentFunctionContext->ensureOperandInRegister(inst->indices[0]);
+    emit("# Index value for '" + array_var->name + "' is in " + index_val_reg);
+
+    // 3. Element size (assuming 4 bytes for int)
+    int element_size = 4; 
+    std::string element_size_reg = currentFunctionContext->reserveRegister();
+    emit("li " + element_size_reg + ", " + std::to_string(element_size));
+
+    // 4. Calculate offset_in_bytes = index_value * element_size
+    std::string offset_bytes_reg = currentFunctionContext->reserveRegister();
+    emit("multu " + index_val_reg + ", " + element_size_reg);
+    emit("mflo " + offset_bytes_reg);
+    emit("# Calculated offset_in_bytes (" + index_val_reg + " * " + std::to_string(element_size) + ") into " + offset_bytes_reg);
+
+    // 5. Calculate final_address = base_address_reg + offset_in_bytes_reg
+    std::string final_addr_reg = base_addr_reg; // Reuse base_addr_reg for final address to save a reg
+    emit("addu " + final_addr_reg + ", " + base_addr_reg + ", " + offset_bytes_reg);
+    emit("# Calculated final element address for '" + array_var->name + "[index]' into " + final_addr_reg);
+
+    // 6. Load word into destination register
+    // The destination variable (inst->destination) needs a register.
+    // ensureOperandInRegister might not be right here if inst->destination is where we WANT to store.
+    // We need to map inst->destination to a physical register if it's not already, or store it if it is.
+    // For now, assuming inst->destination is a temp var that will be assigned a stack slot by MipsFunctionContext
+    // and we load the value into a reserved register, then SW it to inst->destination's stack slot.
+
+    std::string value_loaded_reg = currentFunctionContext->reserveRegister();
+    emit("lw " + value_loaded_reg + ", 0(" + final_addr_reg + ")");
+    emit("# Loaded value from '" + array_var->name + "[index]' into temp reg " + value_loaded_reg);
+
+    // Store the loaded value into the actual destination variable (inst->destination)
+    if (this->currentProgram && this->currentProgram->globalVariables.count(inst->destination->name)) {
+        std::string dest_addr_reg_for_global = currentFunctionContext->reserveRegister();
+        emit("la " + dest_addr_reg_for_global + ", " + inst->destination->name);
+        emit("sw " + value_loaded_reg + ", 0(" + dest_addr_reg_for_global + ")");
+        currentFunctionContext->releaseRegister(dest_addr_reg_for_global);
+        emit("# Stored loaded array element to global destination '" + inst->destination->name + "'");
+    } else {
+        int dest_offset = currentFunctionContext->getVarStackOffset(inst->destination->name);
+        emit("sw " + value_loaded_reg + ", " + std::to_string(dest_offset) + "($fp)");
+        emit("# Stored loaded array element to local destination '" + inst->destination->name + "' at offset " + std::to_string(dest_offset));
+    }
+
+    // Release registers
+    currentFunctionContext->releaseRegister(value_loaded_reg);
+    currentFunctionContext->releaseRegister(offset_bytes_reg);
+    currentFunctionContext->releaseRegister(element_size_reg);
+    currentFunctionContext->releaseRegister(index_val_reg);
+    currentFunctionContext->releaseRegister(base_addr_reg); // This was final_addr_reg
+    emit("# --- End of LoadArrayInst for " + array_var->name + " ---");
+}
+
+void MipsCodeGenerator::visit(std::shared_ptr<IR::StoreArrayInst> inst) {
+    if (!currentFunctionContext || !inst || !inst->arrayDestination || inst->indices.empty() || !inst->valueSource) {
+        emit("# ERROR: StoreArrayInst visited with null context, instruction, destination, indices, or source.");
+        return;
+    }
+    emit("# StoreArrayInst: " + inst->toString());
+
+    auto array_var = std::dynamic_pointer_cast<IR::IRVariable>(inst->arrayDestination);
+    if (!array_var) {
+        emit("# ERROR: StoreArrayInst destination is not an IRVariable: " + inst->arrayDestination->toString());
+        return;
+    }
+
+    // 1. Get base address of the array
+    std::string base_addr_reg = currentFunctionContext->reserveRegister();
+    bool is_global_array = this->currentProgram && this->currentProgram->globalVariables.count(array_var->name);
+
+    if (is_global_array) {
+        emit("la " + base_addr_reg + ", " + array_var->name);
+        emit("# Loaded base address of global array '" + array_var->name + "' into " + base_addr_reg);
+    } else {
+        // Local array (similar to LoadArrayInst, needs robust handling if not pointer)
+        int offset = currentFunctionContext->getVarStackOffset(array_var->name);
+        emit("addiu " + base_addr_reg + ", $fp, " + std::to_string(offset));
+        emit("# Calculated base address of local array '" + array_var->name + "' (offset " + std::to_string(offset) + ") into " + base_addr_reg);
+    }
+
+    // 2. Get index value
+    std::string index_val_reg = currentFunctionContext->ensureOperandInRegister(inst->indices[0]);
+    emit("# Index value for '" + array_var->name + "' is in " + index_val_reg);
+
+    // 3. Element size (assuming 4 bytes for int)
+    int element_size = 4; 
+    std::string element_size_reg = currentFunctionContext->reserveRegister();
+    emit("li " + element_size_reg + ", " + std::to_string(element_size));
+
+    // 4. Calculate offset_in_bytes = index_value * element_size
+    std::string offset_bytes_reg = currentFunctionContext->reserveRegister();
+    emit("multu " + index_val_reg + ", " + element_size_reg);
+    emit("mflo " + offset_bytes_reg);
+    emit("# Calculated offset_in_bytes (" + index_val_reg + " * " + std::to_string(element_size) + ") into " + offset_bytes_reg);
+
+    // 5. Calculate final_address = base_address_reg + offset_in_bytes_reg
+    std::string final_addr_reg = base_addr_reg; // Reuse base_addr_reg
+    emit("addu " + final_addr_reg + ", " + base_addr_reg + ", " + offset_bytes_reg);
+    emit("# Calculated final element address for '" + array_var->name + "[index]' into " + final_addr_reg);
+
+    // 6. Get source value to store into a register
+    std::string value_to_store_reg = currentFunctionContext->ensureOperandInRegister(inst->valueSource);
+    emit("# Value to store in '" + array_var->name + "[index]' is in " + value_to_store_reg);
+
+    // 7. Store word
+    emit("sw " + value_to_store_reg + ", 0(" + final_addr_reg + ")");
+    emit("# Stored value from " + value_to_store_reg + " into '" + array_var->name + "[index]'");
+
+    // Release registers
+    currentFunctionContext->releaseRegister(value_to_store_reg);
+    currentFunctionContext->releaseRegister(offset_bytes_reg);
+    currentFunctionContext->releaseRegister(element_size_reg);
+    currentFunctionContext->releaseRegister(index_val_reg);
+    currentFunctionContext->releaseRegister(base_addr_reg); // This was final_addr_reg
+    emit("# --- End of StoreArrayInst for " + array_var->name + " ---");
+}
 
 void MipsCodeGenerator::visit(std::shared_ptr<IR::LabelInst> inst) {
     emitLabel(inst->name);

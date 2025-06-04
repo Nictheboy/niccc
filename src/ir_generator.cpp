@@ -476,6 +476,7 @@ void IRGenerator::visitReturnStmt(PNNode node) {
             // Depending on language semantics, this could be an error or imply a default/void return.
             // For now, let's assume if an Exp was provided, a value was expected. This might be a point for stricter error handling.
             // Consider adding a void return instruction if the function is void, or error if not.
+            // For now, we'll still create a ReturnInst, which will take nullptr if return_value_operand is still null.
             // Forcing a void return for now if expression evaluation failed to produce an operand.
             auto error_return_inst = std::make_shared<IR::ReturnInst>(nullptr);  // Explicitly pass nullptr
             addInstruction(error_return_inst);
@@ -635,107 +636,90 @@ void IRGenerator::visitIfStmt(PNNode node) {
     std::cerr << "[IR_GEN] visitIfStmt: Completed." << std::endl;
 }
 
-void IRGenerator::visitStmt(PNNode stmtNode) {
-    std::cerr << "[IR_GEN] visitStmt() called for node: " << (stmtNode ? stmtNode->name : "null") << std::endl;
-    if (!stmtNode || stmtNode->children.empty()) {
-        std::cerr << "[IR_GEN] visitStmt: Empty or null Stmt node." << std::endl;
+void IRGenerator::visitStmt(PNNode node) {
+    std::cerr << "[IR_GEN] visitStmt() called for node: " << (node ? node->name : "null") << std::endl;
+    if (!node || node->children.empty()) {
+        std::cerr << "[IR_GEN_ERR] visitStmt: Null or empty Stmt node." << std::endl;
         return;
     }
 
-    // The AST for return is: Stmt("return", Exp, ";")
-    // The AST for assignment could be: Stmt(LVal, "=", Exp, ";")
-    // The AST for ExpStmt could be: Stmt(Exp, ";")
+    auto first_child = node->children.at(0);
 
-    auto first_child_base = stmtNode->children.at(0);
-
-    // Case 1: Keyword-based statements (like return)
-    if (auto terminal_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child_base)) {
-        std::cerr << "[IR_GEN] visitStmt: First child is terminal: " << terminal_child->token->matched << std::endl;
-        if (terminal_child->token->matched == "return") {
-            this->visitReturnStmt(stmtNode);  // visitReturnStmt itself takes the Stmt node
-        }
-        // ... other keyword-based statements like "if", "while", etc.
-        else if (terminal_child->token->matched == "if") { // Added for if statement
-            this->visitIfStmt(stmtNode);
-        }
-        else if (terminal_child->token->matched == "while") { 
-            this->visitWhileStmt(stmtNode);
-        }
-        else if (terminal_child->token->matched == "break") { 
-            this->visitBreakStmt(stmtNode);
-        }
-        else if (terminal_child->token->matched == "continue") { 
-            this->visitContinueStmt(stmtNode);
-        }
-        else {
-            std::cerr << "[IR_GEN] visitStmt: Unhandled keyword-based statement start: " << terminal_child->token->matched << std::endl;
-        }
-    }
-    // Case 2: Expression-based statements (Assignment or ExpStmt)
-    else if (auto non_terminal_child = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child_base)) {
-        std::cerr << "[IR_GEN] visitStmt: First child is non-terminal: " << non_terminal_child->name << std::endl;
-
-        // Check for Assignment: LVal ASSIGN Exp SEMI
-        // Stmt -> LVal ASSIGN_OP Exp SEMI_COLON
-        // Children: 0: LVal, 1: ASSIGN_OP, 2: Exp, (3: SEMI_COLON, optional if absorbed)
-        if (non_terminal_child->name == "LVal" && stmtNode->children.size() >= 3) {
-            auto assign_op_node = std::dynamic_pointer_cast<AST::TerminalNode>(stmtNode->children.at(1));
-            if (assign_op_node && assign_op_node->token && assign_op_node->token->matched == "=") {
-                // This is an assignment statement
-                std::cerr << "[IR_GEN] visitStmt: Detected assignment statement." << std::endl;
-                PNNode lval_node = non_terminal_child;  // This is children.at(0)
-                PNode exp_node = stmtNode->children.at(2);
-
-                std::shared_ptr<IR::IROperand> lval_operand = this->visitLVal(lval_node);
-                std::shared_ptr<IR::IROperand> rhs_operand = this->dispatchVisitExp(exp_node);
-
-                if (lval_operand && rhs_operand) {
-                    // visitLVal returns an IRVariable (which is an IROperand).
-                    // We need to ensure it's actually an IRVariable for the AssignInst.
-                    auto dest_variable = std::dynamic_pointer_cast<IR::IRVariable>(lval_operand);
-                    if (dest_variable) {
-                        // Check if LVal is const
-                        SymbolInfo symbol_info = symbolTable.lookupSymbol(dest_variable->name);
-                        if (symbol_info.is_const) {
-                            std::cerr << "[IR_GEN_ERR] visitStmt: Cannot assign to const variable '" << dest_variable->name << "'." << std::endl;
-                            // Optionally throw an error or stop compilation.
-                            return;
-                        }
-
-                        auto assign_inst = std::make_shared<IR::AssignInst>(dest_variable, rhs_operand);
-                        this->addInstruction(assign_inst);
-                        std::cerr << "[IR_GEN] visitStmt: Added AssignInst for: " << dest_variable->name << " = ..." << std::endl;
-                    } else {
-                        std::cerr << "[IR_GEN_ERR] visitStmt: Destination of assignment is not a variable." << std::endl;
-                    }
-                } else {
-                    std::cerr << "[IR_GEN_ERR] visitStmt: Failed to generate IR for LVal or RHS of assignment." << std::endl;
-                }
-                return;  // Handled assignment
+    if (auto terminal_child = std::dynamic_pointer_cast<AST::TerminalNode>(first_child)) {
+        if (terminal_child->token) {
+            const std::string& token_match = terminal_child->token->matched;
+            if (token_match == "return") {
+                visitReturnStmt(node);
+            } else if (token_match == "if") {
+                visitIfStmt(node);
+            } else if (token_match == "while") {
+                visitWhileStmt(node);
+            } else if (token_match == "break") {
+                visitBreakStmt(node);
+            } else if (token_match == "continue") {
+                visitContinueStmt(node);
+            } else if (token_match == ";") { // Empty statement
+                std::cerr << "[IR_GEN] visitStmt: Empty statement (';'). No IR generated." << std::endl;
+            } else {
+                std::cerr << "[IR_GEN_WARN] visitStmt: Unhandled terminal token at start of Stmt: " << token_match << std::endl;
             }
         }
+    } else if (auto non_terminal_child = std::dynamic_pointer_cast<AST::NonTerminalNode>(first_child)) {
+        const std::string& child_name = non_terminal_child->name;
+        if (child_name == "LVal") { // Potential Assignment: LVal ASSIGN Exp SEMI
+            bool is_assignment = false;
+            if (node->children.size() >= 3) { // Check for LVal, ASSIGN, Exp
+                auto assign_op_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(1));
+                if (assign_op_node && assign_op_node->token && assign_op_node->token->matched == "=") {
+                    is_assignment = true;
+                }
+            }
 
-        // If not an assignment starting with LVal, it might be an ExpStmt.
-        // Stmt -> Exp SEMI
-        // (Covers function calls like printf(); or simple expressions evaluated for side effects)
-        // Check if non_terminal_child->name is one of your expression types
-        if (non_terminal_child->name == "Exp" ||
-            non_terminal_child->name == "LOrExp" ||    // ... and other expression non-terminals from your dispatchVisitExp
-            non_terminal_child->name == "UnaryExp" ||  // UnaryExp can be a function call
-            non_terminal_child->name == "PrimaryExp"
-            /* etc. */
-        ) {
-            std::cerr << "[IR_GEN] visitStmt: Visiting expression child " << non_terminal_child->name << " for side effects (ExpStmt)." << std::endl;
-            this->dispatchVisitExp(non_terminal_child);  // Visit the expression, result is discarded
-        } else if (non_terminal_child->name == "Block") { // Added to handle Stmt -> Block
+            if (is_assignment) {
+                std::cerr << "[IR_GEN] visitStmt: Detected assignment statement." << std::endl;
+                auto lval_node = non_terminal_child; // This is node->children.at(0)
+                auto exp_node = node->children.at(2);
+
+                std::shared_ptr<IR::IROperand> lval_operand_target = this->visitLVal(lval_node, true);
+                std::shared_ptr<IR::IROperand> rhs_operand = this->dispatchVisitExp(exp_node);
+
+                if (!lval_operand_target || !rhs_operand) {
+                    std::cerr << "[IR_GEN_ERR] visitStmt: Failed to generate IR for LVal or RHS of assignment." << std::endl;
+                    lastLValArrayAccessInfo.reset(); 
+                    return;
+                }
+
+                if (lastLValArrayAccessInfo.isValid && lastLValArrayAccessInfo.baseVar) {
+                    std::cerr << "[IR_GEN] visitStmt: Generating StoreArrayInst for: "
+                              << lastLValArrayAccessInfo.baseVar->name << "[...] = ..." << std::endl;
+                    auto store_inst = std::make_shared<IR::StoreArrayInst>(
+                        lastLValArrayAccessInfo.baseVar,
+                        lastLValArrayAccessInfo.indices,
+                        rhs_operand);
+                    this->addInstruction(store_inst);
+                } else if (auto var_target = std::dynamic_pointer_cast<IR::IRVariable>(lval_operand_target)) {
+                    std::cerr << "[IR_GEN] visitStmt: Generating AssignInst for: " << var_target->name << " = ..." << std::endl;
+                    auto assign_inst = std::make_shared<IR::AssignInst>(var_target, rhs_operand);
+                    this->addInstruction(assign_inst);
+                } else {
+                    std::cerr << "[IR_GEN_ERR] visitStmt: LVal for assignment did not resolve to a variable or valid array access." << std::endl;
+                }
+                lastLValArrayAccessInfo.reset(); 
+            } else { // LVal not part of a recognized assignment, treat as ExpStmt
+                std::cerr << "[IR_GEN_WARN] visitStmt: LVal not part of a clear assignment. Assuming ExpStmt with LVal as Exp." << std::endl;
+                this->dispatchVisitExp(non_terminal_child); // Treat LVal as an expression
+            }
+        } else if (child_name == "Exp") { // Expression statement
+            std::cerr << "[IR_GEN] visitStmt: Visiting expression child Exp for side effects (ExpStmt)." << std::endl;
+            this->dispatchVisitExp(non_terminal_child);
+        } else if (child_name == "Block") { // Block statement
             std::cerr << "[IR_GEN] visitStmt: Detected Block child. Dispatching to visitBlock." << std::endl;
-            this->visitBlock(non_terminal_child, true); // Create new scope for the block by default
+            this->visitBlock(non_terminal_child);
         } else {
-            std::cerr << "[IR_GEN] visitStmt: Unhandled non-terminal statement type: " << non_terminal_child->name << std::endl;
+            std::cerr << "[IR_GEN_WARN] visitStmt: Unhandled NonTerminalNode at start of Stmt: " << child_name << std::endl;
         }
     } else {
-        std::cerr << "[IR_GEN] visitStmt: First child of Stmt is neither Terminal nor NonTerminal. Node type ID: "
-                  << (first_child_base ? typeid(*first_child_base).name() : "null_child_pointer") << std::endl;
+        std::cerr << "[IR_GEN_WARN] visitStmt: First child of Stmt is neither TerminalNode nor NonTerminalNode." << std::endl;
     }
 }
 
@@ -1447,6 +1431,7 @@ IRGenerator::IRGenerator()
     // program = std::make_shared<IR::IRProgram>(); // Usually done in generate()
     // defineBuiltinPureFunctions(); // If you have this method for pre-populating pure functions
     loopLabelStack.clear(); // Initialize loop label stack
+    lastLValArrayAccessInfo.reset(); // Initialize lastLValArrayAccessInfo
 }
 
 std::shared_ptr<IR::IRProgram> IRGenerator::generate(PNode rootAstNode) {
@@ -1560,15 +1545,12 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
         if (!decl_node)
             continue;
 
-        // Modified to accept "VarDefItem" as it's collected by visitVarDef/visitConstDef
         if (decl_node->name == "VarDecl" || decl_node->name == "ConstDecl" || decl_node->name == "VarDefItem") {
             if (decl_node->children.empty()) {
                 std::cerr << "[IR_GEN_ERR] visitDecl: Empty VarDecl/ConstDecl/VarDefItem node." << std::endl;
                 continue;
             }
 
-            // VarDefItem structure: IDENT (children[0]), (optional: ArrayDim), (optional: ASSIGN, InitVal)
-            // visitDecl expects IDENT at children[0] of the item node.
             auto ident_node = std::dynamic_pointer_cast<AST::TerminalNode>(decl_node->children.at(0));
             if (!ident_node || !ident_node->token) {
                 std::cerr << "[IR_GEN_ERR] visitDecl: Could not get identifier from " << decl_node->name << "." << std::endl;
@@ -1577,93 +1559,163 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
             std::string var_name = ident_node->token->matched;
             std::cerr << "[IR_GEN] visitDecl: Processing variable: " << var_name << " from node named " << decl_node->name << std::endl;
 
-            auto ir_variable = std::make_shared<IR::IRVariable>(var_name, base_ir_type);
-            ir_variable->is_const = is_const;  // Explicitly set based on parameter
+            std::vector<int> dimension_sizes;
+            bool is_array_decl = false;
+            size_t current_child_idx = 1; 
 
-            if (!symbolTable.addSymbol(var_name, ir_variable, base_ir_type, is_const)) {
-                std::cerr << "[IR_GEN_ERR] visitDecl: Failed to add symbol '" << var_name << "' to symbol table." << std::endl;
-                continue;
-            }
-            std::cerr << "[IR_GEN] visitDecl: Added '" << var_name << "' to symbol table. is_const: " << is_const << std::endl;
-
-            bool is_global = (this->currentNormalFunction == nullptr);
-            ir_variable->is_global = is_global;  // Mark global status on IRVariable
-
-            if (!is_global) {                       // Local variable
-                if (this->currentNormalFunction) {  // Ensure current function context exists
-                    this->currentNormalFunction->addLocal(ir_variable);
-                    std::cerr << "[IR_GEN] visitDecl: Added '" << var_name << "' to local variables of function " << this->currentNormalFunction->name << std::endl;
-                } else {
-                    std::cerr << "[IR_GEN_ERR] visitDecl: currentNormalFunction is null for a non-global variable '" << var_name << "'." << std::endl;
-                    continue;  // Cannot add local var without function context
-                }
-            } else {  // Global variable
-                if (this->program) {
-                    this->program->addGlobalVariable(ir_variable);
-                    std::cerr << "[IR_GEN] visitDecl: Added '" << var_name << "' to global variables." << std::endl;
-                } else {
-                    std::cerr << "[IR_GEN_ERR] visitDecl: this->program is null, cannot add global variable '" << var_name << "'." << std::endl;
-                    continue;
-                }
-            }
-
-            // Initializer processing: A VarDefItem can have children like: IDENT, "=", InitVal
-            // or IDENT, ArrayDim, "=", InitVal
-            // We need to find the "=" and then the InitVal node.
-            // Let's search for "=" token among children of decl_node (VarDefItem).
-            PNode initializer_node = nullptr;
-            for (size_t i = 1; i < decl_node->children.size(); ++i) {  // Start search after IDENT
-                auto child = decl_node->children[i];
-                if (auto terminal_child = std::dynamic_pointer_cast<AST::TerminalNode>(child)) {
-                    if (terminal_child->token && terminal_child->token->matched == "=") {
-                        if (i + 1 < decl_node->children.size()) {
-                            // The node after "=" should be InitVal (which itself contains an Exp)
-                            auto init_val_wrapper_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(decl_node->children[i + 1]);
-                            if (init_val_wrapper_node && init_val_wrapper_node->name == "InitVal" && !init_val_wrapper_node->children.empty()) {
-                                initializer_node = init_val_wrapper_node->children.at(0);  // Get the Exp node from InitVal
-                                std::string init_node_name_for_log = "<unknown_init_node_type>";
-                                if (auto nt_init_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(initializer_node)) {
-                                    init_node_name_for_log = nt_init_node->name;
-                                } else if (auto t_init_node = std::dynamic_pointer_cast<AST::TerminalNode>(initializer_node)) {
-                                    init_node_name_for_log = "TerminalNode(" + (t_init_node->token ? t_init_node->token->matched : "<no_token>") + ")";
+            // Check if child 1 is an ArrayDimension node
+            if (current_child_idx < decl_node->children.size()) {
+                auto array_dim_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(decl_node->children.at(current_child_idx));
+                if (array_dim_node && array_dim_node->name == "ArrayDimension") {
+                    std::cerr << "[IR_GEN] visitDecl: Found ArrayDimension node for '" << var_name << "' with " << array_dim_node->children.size() << " children." << std::endl;
+                    
+                    if (array_dim_node->children.size() >= 3) {
+                        // Should have: '[', Exp, ']'
+                        auto lbracket_node = std::dynamic_pointer_cast<AST::TerminalNode>(array_dim_node->children.at(0));
+                        auto exp_node = array_dim_node->children.at(1);
+                        auto rbracket_node = std::dynamic_pointer_cast<AST::TerminalNode>(array_dim_node->children.at(2));
+                        
+                        if (lbracket_node && lbracket_node->token && lbracket_node->token->matched == "[" &&
+                            rbracket_node && rbracket_node->token && rbracket_node->token->matched == "]" && exp_node) {
+                            
+                            is_array_decl = true;
+                            std::cerr << "[IR_GEN] visitDecl: Visiting size expression for dimension of array '" << var_name << "'." << std::endl;
+                            std::shared_ptr<IR::IROperand> size_operand = this->dispatchVisitExp(exp_node);
+                            if (auto const_size_operand = std::dynamic_pointer_cast<IR::IRConstant>(size_operand)) {
+                                if (const_size_operand->value <= 0) {
+                                    std::cerr << "[IR_GEN_ERR] visitDecl: Array dimension size for '" << var_name << "' must be positive. Got: " << const_size_operand->value << std::endl;
+                                    dimension_sizes.clear(); 
+                                    is_array_decl = false; 
+                                } else {
+                                    dimension_sizes.push_back(const_size_operand->value);
+                                    std::cerr << "[IR_GEN] visitDecl: Parsed dimension size " << const_size_operand->value << " for array '" << var_name << "'." << std::endl;
                                 }
-                                std::cerr << "[IR_GEN] visitDecl: Found initializer for '" << var_name << "'. InitVal contains node: " << init_node_name_for_log << std::endl;
                             } else {
-                                std::cerr << "[IR_GEN_ERR] visitDecl: Expected InitVal node after \'=\' for '" << var_name << "', found different structure." << std::endl;
+                                std::cerr << "[IR_GEN_ERR] visitDecl: Array dimension size for '" << var_name << "' is not a constant expression. "
+                                          << "Resolved to: " << (size_operand ? size_operand->toString() : "null") << std::endl;
+                                dimension_sizes.clear(); 
+                                is_array_decl = false; 
                             }
                         }
-                        break;
+                    } else if (array_dim_node->children.empty()) {
+                        std::cerr << "[IR_GEN] visitDecl: ArrayDimension is empty for '" << var_name << "' - treating as scalar." << std::endl;
                     }
+                    current_child_idx += 1; // Move past the ArrayDimension node
                 }
             }
+
+            std::shared_ptr<IR::IRType> actual_ir_type = base_ir_type;
+            if (is_array_decl && !dimension_sizes.empty()) {
+                actual_ir_type = std::make_shared<IR::ArrayIRType>(base_ir_type, dimension_sizes);
+                std::cerr << "[IR_GEN] visitDecl: Variable '" << var_name << "' is an array. Type: " << actual_ir_type->toString() << std::endl;
+            } else if (is_array_decl && dimension_sizes.empty()) {
+                 std::cerr << "[IR_GEN_WARN] visitDecl: Variable '" << var_name << "' looked like an array declaration but failed to parse dimensions. Treating as scalar." << std::endl;
+            }
+
+            auto ir_variable = std::make_shared<IR::IRVariable>(var_name, actual_ir_type);
+            ir_variable->is_const = is_const; 
+            
+            bool is_global_var = (this->currentNormalFunction == nullptr); // Determine before initializer
+            ir_variable->is_global = is_global_var;
+
+            PNode initializer_node = nullptr;
+            // Look for "=" after ArrayDimension (or after identifier if no ArrayDimension)
+            while (current_child_idx < decl_node->children.size()) {
+                auto assign_op_node = std::dynamic_pointer_cast<AST::TerminalNode>(decl_node->children.at(current_child_idx));
+                if (assign_op_node && assign_op_node->token && assign_op_node->token->matched == "=") {
+                    if (current_child_idx + 1 < decl_node->children.size()) {
+                        auto init_val_wrapper_node = std::dynamic_pointer_cast<AST::NonTerminalNode>(decl_node->children.at(current_child_idx + 1));
+                        if (init_val_wrapper_node && init_val_wrapper_node->name == "InitVal" && !init_val_wrapper_node->children.empty()) {
+                            initializer_node = init_val_wrapper_node->children.at(0);
+                            std::cerr << "[IR_GEN] visitDecl: Found initializer for '" << var_name << "'." << std::endl;
+                        }
+                    }
+                    break;
+                }
+                current_child_idx++;
+            }
+            
+            int parsed_const_val = 0;
+            bool has_parsed_const_val = false;
 
             if (initializer_node) {
                 std::shared_ptr<IR::IROperand> init_val_operand = this->dispatchVisitExp(initializer_node);
                 if (init_val_operand) {
-                    if (is_global) {
-                        if (auto const_init_val = std::dynamic_pointer_cast<IR::IRConstant>(init_val_operand)) {
-                            ir_variable->global_initializer_constant = const_init_val;
-                            std::cerr << "[IR_GEN] visitDecl: Stored constant initializer for global '" << var_name << "'." << std::endl;
+                    if (is_const && !is_array_decl) { 
+                        if (auto const_init_op = std::dynamic_pointer_cast<IR::IRConstant>(init_val_operand)) {
+                            parsed_const_val = const_init_op->value;
+                            has_parsed_const_val = true;
+                            std::cerr << "[IR_GEN] visitDecl: Const scalar '" << var_name << "' has constant initializer value: " << parsed_const_val << std::endl;
+                            if (is_global_var) { // Store for .data segment if global const scalar
+                                ir_variable->global_initializer_constant = const_init_op;
+                            }
                         } else {
-                            std::cerr << "[IR_GEN_ERR] visitDecl: Non-constant initializer for global variable '" << var_name << "' is not supported for direct data segment init." << std::endl;
+                            std::cerr << "[IR_GEN_ERR] visitDecl: Const scalar '" << var_name << "' does not have a constant initializer that resolved to IRConstant." << std::endl;
                         }
-                    } else {                                // Local variable initializer
-                        if (this->currentNormalFunction) {  // Ensure context for adding instruction
+                    }
+                    
+                    if (is_array_decl) { 
+                        std::cerr << "[IR_GEN_WARN] visitDecl: Array initializers (e.g. int a[] = {1,2};) are not supported. Ignoring for '" << var_name << "'." << std::endl;
+                    } else if (is_global_var && !is_const) { 
+                        if (auto const_init_val = std::dynamic_pointer_cast<IR::IRConstant>(init_val_operand)) {
+                            ir_variable->global_initializer_constant = const_init_val; 
+                            std::cerr << "[IR_GEN] visitDecl: Stored .data initializer for global non-const scalar '" << var_name << "'." << std::endl;
+                        } else {
+                            std::cerr << "[IR_GEN_ERR] visitDecl: Non-constant initializer for global non-const scalar '" << var_name << "' requires runtime init." << std::endl;
+                        }
+                    } else if (!is_global_var && !is_array_decl) { // Local scalar (const or non-const)
+                        if (this->currentNormalFunction) {
+                            // For local const scalars, we still add an assign instruction to ensure the value is "loaded" if used.
+                            // The const-ness is primarily for semantic checks by the compiler.
                             auto assign_inst = std::make_shared<IR::AssignInst>(ir_variable, init_val_operand);
                             this->addInstruction(assign_inst);
-                            std::cerr << "[IR_GEN] visitDecl: Added AssignInst for local initializer of '" << var_name << "'." << std::endl;
-                        } else {
-                            std::cerr << "[IR_GEN_ERR] visitDecl: Cannot add AssignInst for '" << var_name << "' due to null currentNormalFunction." << std::endl;
+                            std::cerr << "[IR_GEN] visitDecl: Added AssignInst for local scalar initializer of '" << var_name << "'." << std::endl;
+                        } else { 
+                            std::cerr << "[IR_GEN_ERR] visitDecl: Null currentNormalFunction for local scalar '" << var_name << "'." << std::endl;
                         }
                     }
                 } else {
                     std::cerr << "[IR_GEN_ERR] visitDecl: Failed to generate IR for initializer of '" << var_name << "'." << std::endl;
                 }
-            } else if (is_const) {
-                std::cerr << "[IR_GEN_ERR] visitDecl: ConstDecl for '" << var_name << "' is missing an initializer." << std::endl;
+            } else if (is_const && !is_array_decl) { 
+                 std::cerr << "[IR_GEN_ERR] visitDecl: Const scalar '" << var_name << "' is missing an initializer." << std::endl;
             }
-            // Removed recursive call: else if (decl_node->name == decl_list_node->name) { visitDecl(decl_node, base_ir_type, is_const); }
-            // The new structure with visitVarDef/visitConstDef and collectVarDefItems should handle iteration correctly.
+
+            bool add_success = symbolTable.addSymbol(var_name, ir_variable, actual_ir_type, is_const, has_parsed_const_val, parsed_const_val);
+
+            if (!add_success) {
+                std::cerr << "[IR_GEN_ERR] visitDecl: Failed to add symbol '" << var_name << "' to symbol table." << std::endl;
+                continue;
+            }
+            // Enhanced log for symbol table addition
+            std::cerr << "[IR_GEN_DBG] visitDecl: Added to SYMBOL TABLE: '" << var_name << "'. is_const: " << is_const
+                      << (has_parsed_const_val ? ", const_val: " + std::to_string(parsed_const_val) : "")
+                      << ". actual_ir_type: " << (actual_ir_type ? actual_ir_type->toString() : "null")
+                      << ". ir_variable->type: " << (ir_variable && ir_variable->type ? ir_variable->type->toString() : "null")
+                      << std::endl;
+
+
+            if (!is_global_var) {
+                if (this->currentNormalFunction) {
+                    this->currentNormalFunction->addLocal(ir_variable);
+                    std::cerr << "[IR_GEN] visitDecl: Added '" << var_name << "' to local variables of function " << this->currentNormalFunction->name << std::endl;
+                } else {
+                     std::cerr << "[IR_GEN_ERR] visitDecl: currentNormalFunction is null for a non-global variable '" << var_name << "'." << std::endl;
+                }
+            } else {
+                // <<< ADD DIAGNOSTIC LOG HERE for globals >>>
+                std::cerr << "[IR_GEN_DIAGNOSTIC] visitDecl: PRE-ADD GLOBAL. Var: '" << var_name
+                          << "'. actual_ir_type: " << (actual_ir_type ? actual_ir_type->toString() : "null")
+                          << ". ir_variable->type: " << (ir_variable && ir_variable->type ? ir_variable->type->toString() : "null")
+                          << std::endl;
+
+                if (this->program) {
+                    this->program->addGlobalVariable(ir_variable);
+                    std::cerr << "[IR_GEN] visitDecl: Added '" << var_name << "' to global variables." << std::endl;
+                } else {
+                     std::cerr << "[IR_GEN_ERR] visitDecl: this->program is null, cannot add global variable '" << var_name << "'." << std::endl;
+                }
+            }
         }
     }
 }
@@ -1671,6 +1723,12 @@ void IRGenerator::visitDecl(PNNode decl_list_node, std::shared_ptr<IR::IRType> b
 std::shared_ptr<IR::IROperand> IRGenerator::visitLVal(PNNode node, bool forAssignment /*= false*/) {
     std::cerr << "[IR_GEN] visitLVal() called for node: " << (node ? node->name : "null")
               << ", forAssignment: " << forAssignment << std::endl;
+    // Only reset array access info if this is for assignment (LHS)
+    // This prevents RHS array accesses from clearing LHS array access info
+    if (forAssignment) {
+        lastLValArrayAccessInfo.reset();
+    }
+
     if (!node || node->name != "LVal" || node->children.empty()) {
         std::cerr << "[IR_GEN_ERR] visitLVal: Invalid LVal node." << std::endl;
         return nullptr;
@@ -1678,27 +1736,107 @@ std::shared_ptr<IR::IROperand> IRGenerator::visitLVal(PNNode node, bool forAssig
 
     auto ident_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(0));
     if (!ident_node || !ident_node->token) {
-        std::cerr << "[IR_GEN_ERR] visitLVal: LVal's child is not a valid IDENT token." << std::endl;
+        std::cerr << "[IR_GEN_ERR] visitLVal: LVal's first child is not a valid IDENT token." << std::endl;
         return nullptr;
     }
-
     std::string var_name = ident_node->token->matched;
-    std::cerr << "[IR_GEN] visitLVal: Looking up variable '" << var_name << "'." << std::endl;
+    std::cerr << "[IR_GEN] visitLVal: Processing identifier \'" << var_name << "\'." << std::endl;
 
     SymbolInfo symbol_info = symbolTable.lookupSymbol(var_name);
 
-    if (!symbol_info.variable) {
-        std::cerr << "[IR_GEN_ERR] visitLVal: Variable '" << var_name << "' not found in symbol table." << std::endl;
-        return nullptr;
+    // Handle compile-time constants like 'ArrLen'
+    if (symbol_info.is_const && symbol_info.has_const_value) {
+        std::cerr << "[IR_GEN] visitLVal: Identifier \'" << var_name << "\' is a compile-time constant with value " << symbol_info.const_value << std::endl;
+        return std::make_shared<IR::IRConstant>(symbol_info.const_value);
     }
 
-    std::cerr << "[IR_GEN] visitLVal: Found variable '" << var_name << "' in symbol table. Type: "
+    if (!symbol_info.variable) {
+        std::cerr << "[IR_GEN_ERR] visitLVal: Variable \'" << var_name << "\' not found in symbol table or not a variable type. (is_const: " 
+                  << symbol_info.is_const << ", has_const_value: " << symbol_info.has_const_value << ")" << std::endl;
+        return nullptr;
+    }
+    std::cerr << "[IR_GEN] visitLVal: Found variable \'" << var_name << "\' in symbol table. Type: "
               << (symbol_info.ir_type ? symbol_info.ir_type->toString() : "unknown_type") << std::endl;
 
-    // The forAssignment flag could be used here later if needed, e.g., to return an address operand
-    // for writes vs. a value operand for reads, but for now, returning the IRVariable itself is fine
-    // as the AssignInst handles the store, and expressions will load the value.
+    // Check for array access: LVal -> IDENT LBRACKET Exp RBRACKET ...
+    // Example AST for arr[i]: children are IDENT("arr"), LBRACKET, Exp("i"), RBRACKET
+    if (node->children.size() >= 4) {
+        auto lbracket_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(1));
+        auto exp_node_for_index = node->children.at(2); // PNode
+        auto rbracket_node = std::dynamic_pointer_cast<AST::TerminalNode>(node->children.at(3));
 
+        if (lbracket_node && lbracket_node->token && lbracket_node->token->matched == "[" &&
+            exp_node_for_index &&
+            rbracket_node && rbracket_node->token && rbracket_node->token->matched == "]") {
+
+            std::cerr << "[IR_GEN] visitLVal: Detected array access for \'" << var_name << "\'." << std::endl;
+
+            // Ensure the base variable is actually an array type
+            auto base_array_type = std::dynamic_pointer_cast<IR::ArrayIRType>(symbol_info.variable->type);
+            if (!base_array_type) {
+                std::cerr << "[IR_GEN_ERR] visitLVal: Variable \'" << var_name << "\' is used with array syntax but is not an array type. Actual type: "
+                          << (symbol_info.variable->type ? symbol_info.variable->type->toString() : "null") << std::endl;
+                return nullptr;
+            }
+
+            std::shared_ptr<IR::IROperand> index_operand = this->dispatchVisitExp(exp_node_for_index);
+            if (!index_operand) {
+                std::cerr << "[IR_GEN_ERR] visitLVal: Failed to generate IR for array index expression." << std::endl;
+                return nullptr;
+            }
+            std::cerr << "[IR_GEN] visitLVal: Index operand: " << index_operand->toString() << std::endl;
+
+            // TODO: Handle multi-dimensional arrays by parsing more LBRACKET Exp RBRACKET sequences.
+            // For now, supporting 1D as in testfile.txt
+            std::vector<std::shared_ptr<IR::IROperand>> indices_vector;
+            indices_vector.push_back(index_operand);
+
+            if (forAssignment) {
+                // LHS of an assignment: e.g., arr[i] = ...
+                // Populate info for StoreArrayInst to be created by visitStmt
+                lastLValArrayAccessInfo.baseVar = symbol_info.variable;
+                lastLValArrayAccessInfo.indices = indices_vector;
+                lastLValArrayAccessInfo.isValid = true;
+                std::cerr << "[IR_GEN] visitLVal: LHS array access. Stored info for \'" << var_name << "\'." << std::endl;
+                return symbol_info.variable; // Return the base array variable itself
+            } else {
+                // RHS of an expression or other read context: e.g., x = arr[i]
+                // Generate LoadArrayInst
+                if (!symbol_info.variable->type) {
+                     std::cerr << "[IR_GEN_ERR] visitLVal: Array variable \'" << var_name << "\' has no type information for LoadArrayInst." << std::endl;
+                     return nullptr;
+                }
+                auto element_type = base_array_type->elementType;
+                if (!element_type) {
+                     std::cerr << "[IR_GEN_ERR] visitLVal: Array variable \'" << var_name << "\' has no element type information for LoadArrayInst." << std::endl;
+                     return nullptr;
+                }
+
+                std::string temp_name = "%tmp_arr_load_" + std::to_string(tempVarCounter++);
+                // The type of the temporary variable is the element type of the array.
+                auto dest_temp_var = createNamedVar(temp_name, element_type);
+                 if (this->currentNormalFunction) { // Add to function locals if in a function
+                    this->currentNormalFunction->addLocal(dest_temp_var);
+                }
+
+
+                auto load_inst = std::make_shared<IR::LoadArrayInst>(dest_temp_var, symbol_info.variable, indices_vector);
+                this->addInstruction(load_inst);
+                std::cerr << "[IR_GEN] visitLVal: RHS array access. Added LoadArrayInst for \'" << var_name << "\'. Result in " << dest_temp_var->name << std::endl;
+                return dest_temp_var; // Return the temporary variable holding the loaded value
+            }
+        }
+    }
+
+    // If not an array access, it's a simple variable access.
+    // Check for const assignment error AFTER array access checks, as arr[i] could be const if arr is.
+    if (forAssignment && symbol_info.is_const /* && !symbol_info.has_const_value */ ) { 
+        // If it was a compile-time const, it would have been returned as IRConstant already.
+        // So, if we reach here and is_const is true, it implies assignment to a non-compile-time-value const (e.g. const array name, const pointer).
+        std::cerr << "[IR_GEN_ERR] visitLVal: Cannot assign to const variable '" << var_name << "' (runtime const or const array/pointer)." << std::endl;
+        return nullptr; 
+    }
+    std::cerr << "[IR_GEN] visitLVal: Simple variable access for \'" << var_name << "\'." << std::endl;
     return symbol_info.variable;
 }
 

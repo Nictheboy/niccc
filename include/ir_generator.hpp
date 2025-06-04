@@ -12,6 +12,19 @@
 
 namespace IRGenerator {
 
+// Add this struct
+struct LastLValArrayAccess {
+    std::shared_ptr<IR::IRVariable> baseVar;
+    std::vector<std::shared_ptr<IR::IROperand>> indices;
+    bool isValid = false;
+
+    void reset() {
+        baseVar = nullptr;
+        indices.clear();
+        isValid = false;
+    }
+};
+
 class IRGenerator {
    public:
     using PNode = std::shared_ptr<AST::Node>;
@@ -29,6 +42,8 @@ class IRGenerator {
     int tempVarCounter;
     int labelCounter;
     std::vector<std::pair<std::shared_ptr<IR::IRLabelOperand>, std::shared_ptr<IR::IRLabelOperand>>> loopLabelStack; // {continue_target, break_target}
+
+    LastLValArrayAccess lastLValArrayAccessInfo; // Add this member
 
     // --- 工具方法 ---
     std::shared_ptr<IR::IRVariable> createTempSimpleVar(IR::SimpleTypeKind kind = IR::SimpleTypeKind::INTEGER, const std::string& prefix = "%t");
